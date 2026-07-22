@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "568678497982",
+    "project_id": "ai-business-assistant-fad4d",
+    "storage_bucket": "ai-business-assistant-fad4d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:568678497982:android:d675075a50c814ff1ae8ef",
+        "android_client_info": {
+          "package_name": "com.example.mobile_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "568678497982-pm0nf4thp58qb2fu7m1c8nkjvfhndqp5.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.mobile_app",
+            "certificate_hash": "3e5bb89844950fda73650bfa29d3eeed0de8d3ec"
+          }
+        },
+        {
+          "client_id": "568678497982-phe0c19a5io68ea1p4otl46s9rnariin.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCTJgAH4rgpdjzCEPwT73-LYjwKkjNE2qs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "568678497982-phe0c19a5io68ea1p4otl46s9rnariin.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
