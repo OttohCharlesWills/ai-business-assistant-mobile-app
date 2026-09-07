@@ -21,6 +21,12 @@ dependencies:
   fl_chart: ^1.2.0
   flutter_launcher_icons: ^0.14.4
   firebase_messaging: ^16.4.1
+  url_launcher: ^6.3.0
+  path_provider: ^2.1.6
+  open_filex: ^4.7.0
+  sqflite: ^2.4.3
+  path: ^1.9.1
+  uuid: ^4.6.0
 
 dev_dependencies:
   flutter_test:

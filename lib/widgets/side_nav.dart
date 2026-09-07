@@ -14,6 +14,14 @@ import '../screens/admin/invoice/receivables_screen.dart';
 import '../screens/admin/customer/customer_screen.dart';
 import '../screens/admin/notification/notification_screen.dart';
 import '../screens/admin/profile/profile_screen.dart';
+import '../screens/admin/reports/profit_report_screen.dart';
+import '../screens/admin/reports/production_report_screen.dart';
+import '../screens/admin/reports/sales_report_screen.dart';
+import '../screens/admin/reports/stock_report_screen.dart';
+import '../screens/admin/production/production_screen.dart';
+import '../screens/admin/production/production_create_screen.dart';
+import '../screens/admin/productionEntry/production_entry_list_screen.dart';
+import '../screens/admin/prouctionType/production_type_screen.dart';
 import '../screens/login_screen.dart';
 
 class SideNav extends StatefulWidget {
@@ -26,6 +34,8 @@ class SideNav extends StatefulWidget {
 class _SideNavState extends State<SideNav> {
   bool _usersExpanded = false;
   bool _invoiceExpanded = false;
+  bool _reportsExpanded = false;
+  bool _productionExpanded = false;
 
   @override
   void initState() {
@@ -181,6 +191,119 @@ class _SideNavState extends State<SideNav> {
                           Navigator.pop(context);
                           Navigator.push(context,
                               MaterialPageRoute(builder: (_) => const ReceivablesScreen()));
+                        },
+                      ),
+                    ],
+                  ),
+
+                  // PRODUCTION & MANUFACTURING EXPANDABLE
+                  _ExpandableNavItem(
+                    icon: Icons.precision_manufacturing_rounded,
+                    label: "Production & Manufacturing",
+                    isExpanded: _productionExpanded,
+                    onTap: () => setState(() => _productionExpanded = !_productionExpanded),
+                    children: [
+                      _SubNavItem(
+                        icon: Icons.list_alt_rounded,
+                        label: "Production Batches",
+                        onTap: () {
+                          Navigator.pop(context);
+                          Navigator.push(context,
+                              MaterialPageRoute(builder: (_) => const ProductionScreen()));
+                        },
+                      ),
+                      _SubNavItem(
+                        icon: Icons.add_circle_outline_rounded,
+                        label: "New Production",
+                        onTap: () {
+                          Navigator.pop(context);
+                          Navigator.push(context,
+                              MaterialPageRoute(builder: (_) => const ProductionCreateScreen()));
+                        },
+                      ),
+                      _SubNavItem(
+                        icon: Icons.playlist_add_check_rounded,
+                        label: "Production Entries",
+                        onTap: () {
+                          Navigator.pop(context);
+                          Navigator.push(context,
+                              MaterialPageRoute(builder: (_) => const ProductionEntryListScreen()));
+                        },
+                      ),
+                      _SubNavItem(
+                        icon: Icons.category_outlined,
+                        label: "Production Types",
+                        onTap: () {
+                          Navigator.pop(context);
+                          Navigator.push(context,
+                              MaterialPageRoute(builder: (_) => const ProductionTypeScreen()));
+                        },
+                      ),
+                    ],
+                  ),
+
+                  // REPORTS EXPANDABLE
+                  _ExpandableNavItem(
+                    icon: Icons.analytics_rounded,
+                    label: "Reports",
+                    isExpanded: _reportsExpanded,
+                    onTap: () {
+                      setState(() => _reportsExpanded = !_reportsExpanded);
+                    },
+                    children: [
+                      _SubNavItem(
+                        icon: Icons.attach_money_rounded,
+                        label: "Sales Report",
+                        onTap: () {
+                          Navigator.pop(context);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const SalesReportScreen(),
+                            ),
+                          );
+                        },
+                      ),
+
+                      _SubNavItem(
+                        icon: Icons.account_balance_wallet_rounded,
+                        label: "Profit Report",
+                        onTap: () {
+                          Navigator.pop(context);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const ProfitReportScreen(),
+                            ),
+                          );
+                        },
+                      ),
+
+                      _SubNavItem(
+                        icon: Icons.precision_manufacturing_rounded,
+                        label: "Production Report",
+                        onTap: () {
+                          Navigator.pop(context);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const ProductionReportScreen(),
+                            ),
+                          );
+                        },
+                      ),
+
+                      _SubNavItem(
+                        icon: Icons.inventory_2_rounded,
+                        label: "Stock Report",
+                        onTap: () {
+                          Navigator.pop(context);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const StockReportScreen(),
+                            ),
+                          );
                         },
                       ),
                     ],
