@@ -8,6 +8,7 @@ import '../screens/cashier/invoice/cashier_invoice_create_screen.dart';
 import '../screens/cashier/invoice/cashier_invoice_list_screen.dart';
 import '../screens/cashier/invoice/cashier_invoice_receivables_screen.dart';
 import '../screens/cashier/offline/offline_sales_screen.dart';
+import '../screens/cashier/sales/cashier_sales_screen.dart';
 
 class CashierSideNav extends StatefulWidget {
   const CashierSideNav({super.key});
@@ -191,9 +192,15 @@ class _CashierSideNavState extends State<CashierSideNav> {
                   ),
 
                   _NavItem(
-                    icon: Icons.notifications_rounded,
-                    label: "Notifications",
-                    onTap: () => Navigator.pop(context),
+                    icon: Icons.shopping_cart_rounded,
+                    label: "Sales",
+                    onTap: () {
+                      Navigator.pop(context); // close the drawer
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const CashierSalesScreen()),
+                      );
+                    },
                   ),
 
                   const SizedBox(height: 16),

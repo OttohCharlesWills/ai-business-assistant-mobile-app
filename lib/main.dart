@@ -31,6 +31,8 @@ import 'screens/splash_screen.dart';
 import 'providers/notification_provider.dart';
 import 'widgets/connectivity_wrapper.dart';
 
+final navigatorKey = GlobalKey<NavigatorState>();
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -53,6 +55,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return ConnectivityWrapper(
       child: MaterialApp(
+        navigatorKey: navigatorKey, 
         debugShowCheckedModeBanner: false,
         title: "AI Business Assistant",
         theme: ThemeData(

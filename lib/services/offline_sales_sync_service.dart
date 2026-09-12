@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'api_client.dart' as http;
 import 'auth_service.dart';
 import 'offline_db_service.dart';
 import 'offline_pos_service.dart';
