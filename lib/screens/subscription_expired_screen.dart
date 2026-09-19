@@ -2,9 +2,27 @@ import 'package:flutter/material.dart';
 import '../main.dart';              // for navigatorKey
 import '../services/auth_service.dart'; // wherever AuthService actually lives
 import 'login_screen.dart';         // wherever LoginScreen actually lives
+import 'subscription_screen.dart';
+// import 'dashboard_screen.dart';  // TODO: import the screen users land on after login
 
 class SubscriptionExpiredScreen extends StatelessWidget {
   const SubscriptionExpiredScreen({super.key});
+
+  void _openSubscription(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SubscriptionScreen(
+          onActivated: () {
+            navigatorKey.currentState?.pushAndRemoveUntil(
+              // TODO: replace LoginScreen with your dashboard / home screen
+              MaterialPageRoute(builder: (_) => const LoginScreen()),
+              (route) => false,
+            );
+          },
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +58,7 @@ class SubscriptionExpiredScreen extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               const Text(
-                "Your subscription has expired. Please renew on the website to continue using the app.",
+                "Your subscription has expired. Choose a plan to renew and keep using the app.",
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Color(0xFF8FAADC),
@@ -60,20 +78,28 @@ class SubscriptionExpiredScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  onPressed: () async {
-                    await AuthService.logout(); // clear stored token
-                    navigatorKey.currentState?.pushAndRemoveUntil(
-                      MaterialPageRoute(builder: (_) => const LoginScreen()),
-                      (route) => false,
-                    );
-                  },
+                  onPressed: () => _openSubscription(context),
                   child: const Text(
-                    "Back to Login",
+                    "Renew subscription",
                     style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () async {
+                  await AuthService.logout(); // clear stored token
+                  navigatorKey.currentState?.pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (_) => const LoginScreen()),
+                    (route) => false,
+                  );
+                },
+                child: const Text(
+                  "Back to Login",
+                  style: TextStyle(color: Color(0xFF8FAADC)),
                 ),
               ),
             ],

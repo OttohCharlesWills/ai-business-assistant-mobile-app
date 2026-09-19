@@ -4,6 +4,7 @@ import '../helpers/role_router.dart';
 import '../widgets/app_loader.dart';
 import '../services/fcm_service.dart';
 import 'register_screen.dart';
+import '../helpers/error_message.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -24,6 +25,8 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => loading = true);
 
     try {
+      await AuthService.saveLastEmail(emailController.text.trim()); 
+
       final response = await AuthService.login(
         email: emailController.text.trim(),
         password: passwordController.text,
@@ -52,7 +55,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: $e")),
+        SnackBar(content: Text(friendlyError(e))),
       );
     }
   }
@@ -69,7 +72,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(response['message'])),
+      SnackBar(content: Text(friendlyError(response['message'] ?? 'Something went wrong'))),
     );
 
     if (success) {
@@ -130,9 +133,16 @@ class _LoginScreenState extends State<LoginScreen> {
                           color: const Color(0xFF2F5DA8),
                           borderRadius: BorderRadius.circular(16),
                         ),
-                        child: const Icon(
-                          Icons.smart_toy_rounded,
-                          color: Colors.white,
+                        child: Image.asset(
+                          'assets/icon/icon.png',
+                          width: 60,
+                          height: 60,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => const Icon(
+                            Icons.smart_toy_rounded,
+                            size: 60,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
 

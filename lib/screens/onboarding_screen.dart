@@ -29,8 +29,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     },
     {
       "icon": Icons.smart_toy_rounded,
-      "title": "AI Business Assistant",
-      "description": "Talk to AI naturally and let it update your inventory and sales.",
+      "title": "Bloommonie",
+      "description": "Know What Your Business Is Doing.",
       "color": const Color(0xFF0C1F3F),
       "lightColor": const Color(0xFF2F5DA8),
     },

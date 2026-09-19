@@ -2,6 +2,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../services/cashier_dashboard_service.dart';
 import '../../widgets/cashier_side_nav.dart';
+import '../../models/receipt_data.dart';
+import '../../services/auth_service.dart';
+import '../receipt_screen.dart';
 
 // Laravel returns decimal columns (like price) as STRINGS in JSON
 // unless the model casts them — this handles both String and num safely.
@@ -34,10 +37,14 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
 
   final List<Map<String, dynamic>> _cart = [];
 
+  // Printed on the receipt as the cashier's name
+  String? _cashierName;
+
   @override
   void initState() {
     super.initState();
     _loadHome();
+    _loadCashierName();
   }
 
   @override
@@ -45,6 +52,20 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
     _searchController.dispose();
     _debounce?.cancel();
     super.dispose();
+  }
+
+  Future<void> _loadCashierName() async {
+    final info = await AuthService.getUserInfo();
+    if (!mounted) return;
+    _cashierName = info?['name']?.toString();
+  }
+
+  // Opens the receipt page. Uses the screen's own context: the context inside
+  // the cart bottom sheet belongs to the sheet, which is already closed by then.
+  void _openReceipt(ReceiptData receipt) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => ReceiptScreen(receipt: receipt)),
+    );
   }
 
   Future<void> _loadHome() async {
@@ -186,7 +207,7 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
         elevation: 0,
         centerTitle: true,
         title: const Text(
-          "Stock X",
+          "Bloommonie",
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         leading: Builder(
@@ -517,9 +538,20 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
 
               if (result['success'] == true) {
                 if (!mounted) return;
+
+                // Build the receipt BEFORE the cart is cleared
+                final receipt = ReceiptData.fromCart(
+                  cart: _cart,
+                  transactionId: result['txn_id']?.toString(),
+                  cashierName: _cashierName,
+                  customerName: customerNameController.text,
+                  customerPhone: customerPhoneController.text,
+                  paymentMethod: paymentMethod,
+                );
+
                 Navigator.pop(sheetContext);
                 setState(() => _cart.clear());
-                _showSaleCompleteDialog(result);
+                _openReceipt(receipt);
               } else {
                 _showSnack(_extractMessage(result['message']) ?? 'Sale failed', isError: true);
               }
@@ -640,33 +672,6 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
           },
         );
       },
-    );
-  }
-
-  void _showSaleCompleteDialog(Map<String, dynamic> result) {
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: cardColor,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.check_circle, color: Colors.greenAccent),
-            SizedBox(width: 8),
-            Text('Sale Complete', style: TextStyle(color: Colors.white)),
-          ],
-        ),
-        content: Text(
-          'Transaction ID: ${result['txn_id'] ?? '-'}',
-          style: const TextStyle(color: subtitleColor),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Done', style: TextStyle(color: accentColor)),
-          ),
-        ],
-      ),
     );
   }
 }

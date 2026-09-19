@@ -262,4 +262,14 @@ class AuthService {
       };
     }
   }
-}
+
+  static Future<void> saveLastEmail(String email) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('last_login_email', email);
+  }
+
+  static Future<String?> getLastEmail() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('last_login_email');
+  }
+  }

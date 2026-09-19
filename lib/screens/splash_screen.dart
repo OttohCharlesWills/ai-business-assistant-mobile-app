@@ -57,17 +57,23 @@ class _SplashScreenState extends State<SplashScreen> {
                 color: const Color(0xFF2F5DA8),
                 borderRadius: BorderRadius.circular(24),
               ),
-              child: const Icon(
-                Icons.smart_toy_rounded,
-                size: 60,
-                color: Colors.white,
+              child: Image.asset(
+                'assets/icon/icon.png',
+                width: 60,
+                height: 60,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const Icon(
+                  Icons.smart_toy_rounded,
+                  size: 60,
+                  color: Colors.white,
+                ),
               ),
             ),
 
             const SizedBox(height: 24),
 
             const Text(
-              "AI Business Assistant",
+              "Bloommonie",
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -78,7 +84,7 @@ class _SplashScreenState extends State<SplashScreen> {
             const SizedBox(height: 8),
 
             const Text(
-              "Smart tools for your business",
+              "Know What Your Business Is Doing.",
               style: TextStyle(
                 fontSize: 14,
                 color: Color(0xFF8FAADC),

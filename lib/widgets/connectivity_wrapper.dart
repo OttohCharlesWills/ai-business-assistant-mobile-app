@@ -71,38 +71,48 @@ class _ConnectivityWrapperState extends State<ConnectivityWrapper> {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        widget.child,
+    // This widget sits ABOVE MaterialApp, so nothing has supplied text
+    // direction or screen metrics yet. Provide both here.
+    //  - Directionality: required by Stack (and Row/Text below)
+    //  - MediaQuery.fromView: required by SafeArea inside the banner
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: MediaQuery.fromView(
+        view: View.of(context),
+        child: Stack(
+          children: [
+            widget.child,
 
-        if (!_isConnected)
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: IgnorePointer(
-              child: _Banner(
-                message: "No Internet Connection",
-                icon: Icons.wifi_off_rounded,
-                color: const Color(0xFFB71C1C),
+            if (!_isConnected)
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: IgnorePointer(
+                  child: _Banner(
+                    message: "No Internet Connection",
+                    icon: Icons.wifi_off_rounded,
+                    color: const Color(0xFFB71C1C),
+                  ),
+                ),
               ),
-            ),
-          ),
 
-        if (_isConnected && _showRestored)
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: IgnorePointer(
-              child: _Banner(
-                message: "Internet Connection Restored",
-                icon: Icons.wifi_rounded,
-                color: const Color(0xFF2E7D32),
+            if (_isConnected && _showRestored)
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: IgnorePointer(
+                  child: _Banner(
+                    message: "Internet Connection Restored",
+                    icon: Icons.wifi_rounded,
+                    color: const Color(0xFF2E7D32),
+                  ),
+                ),
               ),
-            ),
-          ),
-      ],
+          ],
+        ),
+      ),
     );
   }
 }
@@ -170,6 +180,9 @@ class _BannerState extends State<_Banner>
                   color: Colors.white,
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
+                  // No Material ancestor up here, so without this Flutter
+                  // draws its yellow double underline under the text.
+                  decoration: TextDecoration.none,
                 ),
               ),
             ],

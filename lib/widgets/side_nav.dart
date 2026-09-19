@@ -70,15 +70,21 @@ class _SideNavState extends State<SideNav> {
                       color: const Color(0xFF2F5DA8),
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    child: const Icon(
-                      Icons.smart_toy_rounded,
-                      color: Colors.white,
-                      size: 28,
-                    ),
+                    child: Image.asset(
+                          'assets/icon/icon.png',
+                          width: 60,
+                          height: 60,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => const Icon(
+                            Icons.smart_toy_rounded,
+                            size: 60,
+                            color: Colors.white,
+                          ),
+                        ),
                   ),
                   const SizedBox(height: 16),
                   const Text(
-                    "Stock X",
+                    "Bloommonie",
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 18,
@@ -309,17 +315,17 @@ class _SideNavState extends State<SideNav> {
                     ],
                   ),
 
-                  _NavItem(
-                    icon: Icons.bar_chart_rounded,
-                    label: "Analytics",
-                    onTap: () => Navigator.pop(context),
-                  ),
+                  // _NavItem(
+                  //   icon: Icons.bar_chart_rounded,
+                  //   label: "Analytics",
+                  //   onTap: () => Navigator.pop(context),
+                  // ),
 
-                  _NavItem(
-                    icon: Icons.smart_toy_rounded,
-                    label: "AI Assistant",
-                    onTap: () => Navigator.pop(context),
-                  ),
+                  // _NavItem(
+                  //   icon: Icons.smart_toy_rounded,
+                  //   label: "AI Assistant",
+                  //   onTap: () => Navigator.pop(context),
+                  // ),
 
                   // NOTIFICATIONS WITH BADGE
                   _NavItemWithBadge(
