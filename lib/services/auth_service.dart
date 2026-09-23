@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'api_client.dart' as http;
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -14,6 +15,16 @@ class AuthService {
   static const int tokenExpiryDays = 30;
 
   static final GoogleSignIn googleSignIn = GoogleSignIn();
+
+  static final ValueNotifier<Map<String, dynamic>?> trialNotifier =
+      ValueNotifier(null);
+
+  // Call once at app startup to restore trial state if already logged in
+  static Future<void> loadTrialNotifier() async {
+    final free = await isFreeTrial();
+    final days = await getTrialDaysLeft();
+    trialNotifier.value = free ? {'days_left': days} : null;
+  }
 
   // SAVE TOKEN + EXPIRY + ROLE
   static Future<void> saveToken(String token) async {
@@ -38,6 +49,30 @@ class AuthService {
     await prefs.setString('user_info', jsonEncode(user));
   }
 
+  // SAVE TRIAL INFO
+  static Future<void> saveTrialInfo({
+    required bool isFreeTrial,
+    required int trialDaysLeft,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('is_free_trial', isFreeTrial);
+    await prefs.setInt('trial_days_left', trialDaysLeft);
+
+    trialNotifier.value = isFreeTrial ? {'days_left': trialDaysLeft} : null;
+  }
+
+  // SAVE EMAIL VERIFIED FLAG
+  static Future<void> saveEmailVerified(bool verified) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('email_verified', verified);
+  }
+
+  // GET EMAIL VERIFIED FLAG
+  static Future<bool> isEmailVerified() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('email_verified') ?? true;
+  }
+
   // GET TOKEN
   static Future<String?> getToken() async {
     final prefs = await SharedPreferences.getInstance();
@@ -58,6 +93,17 @@ class AuthService {
     return jsonDecode(userString);
   }
 
+  // GET TRIAL INFO
+  static Future<bool> isFreeTrial() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('is_free_trial') ?? false;
+  }
+
+  static Future<int> getTrialDaysLeft() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt('trial_days_left') ?? 0;
+  }
+
   // CLEAR TOKEN + ROLE + USER INFO
   static Future<void> clearToken() async {
     final prefs = await SharedPreferences.getInstance();
@@ -65,6 +111,11 @@ class AuthService {
     await prefs.remove('token_expiry');
     await prefs.remove('user_role');
     await prefs.remove('user_info');
+    await prefs.remove('is_free_trial');
+    await prefs.remove('trial_days_left');
+    await prefs.remove('email_verified');
+
+    trialNotifier.value = null;
   }
 
   // CHECK IF TOKEN IS EXPIRED
@@ -109,6 +160,61 @@ class AuthService {
 
     } catch (e) {
       return true;
+    }
+  }
+
+  // RE-CHECK EMAIL VERIFICATION STATUS FROM SERVER
+  // NOTE: requires a GET /api/user route that returns the user object
+  // (with email_verified_at) — confirm/add this route on the backend.
+  static Future<bool> checkVerificationStatus() async {
+    final token = await getToken();
+    if (token == null) return false;
+
+    try {
+      final response = await http.get(
+        Uri.parse("$baseUrl/user"),
+        headers: {
+          "Accept": "application/json",
+          "Authorization": "Bearer $token",
+        },
+      );
+
+      if (response.statusCode != 200) return false;
+
+      final data = jsonDecode(response.body);
+      final user = data['user'] ?? data;
+      final verified = user['email_verified_at'] != null;
+
+      await saveEmailVerified(verified);
+      return verified;
+
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // RESEND VERIFICATION EMAIL
+  // NOTE: requires an API-friendly resend route (bearer-token auth,
+  // not the default web session-based verification.resend) — to be added.
+  static Future<Map<String, dynamic>> resendVerificationEmail() async {
+    final token = await getToken();
+    if (token == null) {
+      return {"status": false, "message": "Not logged in"};
+    }
+
+    try {
+      final response = await http.post(
+        Uri.parse("$baseUrl/email/resend"),
+        headers: {
+          "Accept": "application/json",
+          "Authorization": "Bearer $token",
+        },
+      );
+
+      return jsonDecode(response.body);
+
+    } catch (e) {
+      return {"status": false, "message": e.toString()};
     }
   }
 
@@ -163,6 +269,7 @@ class AuthService {
     required String name,
     required String email,
     required String password,
+    String? phone,
   }) async {
 
     final response = await http.post(
@@ -172,6 +279,7 @@ class AuthService {
         "name": name,
         "email": email,
         "password": password,
+        if (phone != null) "phone": phone,
       },
     );
 
@@ -183,6 +291,11 @@ class AuthService {
       if (data['user'] != null) {
         await saveUserInfo(data['user']);
       }
+      await saveTrialInfo(
+        isFreeTrial: data['is_free_trial'] ?? false,
+        trialDaysLeft: data['trial_days_left'] ?? 0,
+      );
+      await saveEmailVerified(data['email_verified'] ?? false);
     }
 
     return data;
@@ -211,6 +324,11 @@ class AuthService {
       if (data['user'] != null) {
         await saveUserInfo(data['user']);
       }
+      await saveTrialInfo(
+        isFreeTrial: data['is_free_trial'] ?? false,
+        trialDaysLeft: data['trial_days_left'] ?? 0,
+      );
+      await saveEmailVerified(data['email_verified'] ?? true);
     }
 
     return data;
@@ -250,6 +368,11 @@ class AuthService {
         if (data['user'] != null) {
           await saveUserInfo(data['user']);
         }
+        await saveTrialInfo(
+          isFreeTrial: data['is_free_trial'] ?? false,
+          trialDaysLeft: data['trial_days_left'] ?? 0,
+        );
+        await saveEmailVerified(data['email_verified'] ?? true);
       }
 
       return data;

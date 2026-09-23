@@ -4,6 +4,7 @@ import '../services/fcm_service.dart';
 import '../widgets/app_loader.dart';
 import 'admin/dashboard_screen.dart';
 import 'login_screen.dart';
+import 'verify_email_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -15,6 +16,7 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> {
   final nameController = TextEditingController();
   final emailController = TextEditingController();
+  final phoneController = TextEditingController();
   final passwordController = TextEditingController();
 
   bool loading = false;
@@ -28,6 +30,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         name: nameController.text.trim(),
         email: emailController.text.trim(),
         password: passwordController.text,
+        phone: phoneController.text.trim(),
       );
 
       setState(() => loading = false);
@@ -44,8 +47,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (success) {
         await FCMService.init(); // ✅ init FCM + send token to backend
         if (!mounted) return;
+
+        final emailVerified = response['email_verified'] ?? false;
+
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const DashboardScreen()),
+          MaterialPageRoute(
+            builder: (context) => emailVerified
+                ? const DashboardScreen()
+                : const VerifyEmailScreen(),
+          ),
         );
       }
     } catch (e) {
@@ -77,9 +87,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (success) {
       await FCMService.init(); // ✅ init FCM + send token to backend
       if (!mounted) return;
+
+      final emailVerified = response['email_verified'] ?? true;
+
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const DashboardScreen()),
+        MaterialPageRoute(
+          builder: (_) => emailVerified
+              ? const DashboardScreen()
+              : const VerifyEmailScreen(),
+        ),
       );
     }
   }
@@ -201,6 +218,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       hint: "Enter your email",
                       icon: Icons.email_outlined,
                       keyboardType: TextInputType.emailAddress,
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    _buildLabel("Phone Number"),
+                    const SizedBox(height: 8),
+                    _buildTextField(
+                      controller: phoneController,
+                      hint: "Enter your phone number",
+                      icon: Icons.phone_outlined,
+                      keyboardType: TextInputType.phone,
                     ),
 
                     const SizedBox(height: 20),

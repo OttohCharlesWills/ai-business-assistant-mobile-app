@@ -4,6 +4,7 @@ import '../helpers/role_router.dart';
 import '../widgets/app_loader.dart';
 import '../services/fcm_service.dart';
 import 'register_screen.dart';
+import 'verify_email_screen.dart';
 import '../helpers/error_message.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -46,6 +47,17 @@ class _LoginScreenState extends State<LoginScreen> {
       if (success) {
         await FCMService.init(); // ✅ init FCM + send token to backend
         if (!mounted) return;
+
+        final emailVerified = response['email_verified'] ?? true;
+
+        if (!emailVerified) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const VerifyEmailScreen()),
+          );
+          return;
+        }
+
         RoleRouter.navigateFromResponse(context, response);
       }
 
@@ -78,6 +90,17 @@ class _LoginScreenState extends State<LoginScreen> {
     if (success) {
       await FCMService.init(); // ✅ init FCM + send token to backend
       if (!mounted) return;
+
+      final emailVerified = response['email_verified'] ?? true;
+
+      if (!emailVerified) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const VerifyEmailScreen()),
+        );
+        return;
+      }
+
       RoleRouter.navigateFromResponse(context, response);
     }
   }

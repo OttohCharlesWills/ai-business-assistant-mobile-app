@@ -1,27 +1,37 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../providers/notification_provider.dart';
 import '../services/auth_service.dart';
+
 import '../screens/admin/category/category_screen.dart';
 import '../screens/admin/shop/shop_screen.dart';
 import '../screens/admin/product/product_screen.dart';
 import '../screens/admin/sales/sales_screen.dart';
 import '../screens/admin/register/register_staff_screen.dart';
 import '../screens/admin/roles/manage_roles_screen.dart';
+
 import '../screens/admin/invoice/invoice_screen.dart';
 import '../screens/admin/invoice/create_invoice_screen.dart';
 import '../screens/admin/invoice/receivables_screen.dart';
+
 import '../screens/admin/customer/customer_screen.dart';
 import '../screens/admin/notification/notification_screen.dart';
 import '../screens/admin/profile/profile_screen.dart';
+
 import '../screens/admin/reports/profit_report_screen.dart';
 import '../screens/admin/reports/production_report_screen.dart';
 import '../screens/admin/reports/sales_report_screen.dart';
 import '../screens/admin/reports/stock_report_screen.dart';
+
 import '../screens/admin/production/production_screen.dart';
 import '../screens/admin/production/production_create_screen.dart';
 import '../screens/admin/productionEntry/production_entry_list_screen.dart';
 import '../screens/admin/prouctionType/production_type_screen.dart';
+
+import '../screens/admin/stock/stock_transfer_screen.dart';
+import '../screens/admin/setting/setting_screen.dart';
+
 import '../screens/login_screen.dart';
 
 class SideNav extends StatefulWidget {
@@ -40,10 +50,74 @@ class _SideNavState extends State<SideNav> {
   @override
   void initState() {
     super.initState();
-    // Fetch unread count when sidebar opens
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<NotificationProvider>().fetchUnreadCount();
     });
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // OPEN STOCK TRANSFER
+  // ─────────────────────────────────────────────────────────────────────────
+
+  Future<void> _openStockTransfer() async {
+    Navigator.pop(context);
+
+    final token = await AuthService.getToken();
+
+    if (!mounted) return;
+
+    if (token == null || token.isEmpty) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const LoginScreen(),
+        ),
+      );
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => StockTransferScreen(
+          baseUrl: AuthService.baseUrl,
+          token: token,
+        ),
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // OPEN SETTINGS
+  // ─────────────────────────────────────────────────────────────────────────
+
+  Future<void> _openSettings() async {
+    Navigator.pop(context);
+
+    final token = await AuthService.getToken();
+
+    if (!mounted) return;
+
+    if (token == null || token.isEmpty) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const LoginScreen(),
+        ),
+      );
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SettingScreen(
+          baseUrl: AuthService.baseUrl,
+          token: token,
+        ),
+      ),
+    );
   }
 
   @override
@@ -55,7 +129,6 @@ class _SideNavState extends State<SideNav> {
       child: SafeArea(
         child: Column(
           children: [
-
             // HEADER
             Container(
               padding: const EdgeInsets.all(24),
@@ -71,18 +144,20 @@ class _SideNavState extends State<SideNav> {
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Image.asset(
-                          'assets/icon/icon.png',
-                          width: 60,
-                          height: 60,
-                          fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => const Icon(
-                            Icons.smart_toy_rounded,
-                            size: 60,
-                            color: Colors.white,
-                          ),
-                        ),
+                      'assets/icon/icon.png',
+                      width: 60,
+                      height: 60,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => const Icon(
+                        Icons.smart_toy_rounded,
+                        size: 60,
+                        color: Colors.white,
+                      ),
+                    ),
                   ),
+
                   const SizedBox(height: 16),
+
                   const Text(
                     "Bloommonie",
                     style: TextStyle(
@@ -91,6 +166,7 @@ class _SideNavState extends State<SideNav> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
+
                   const Text(
                     "Business Assistant",
                     style: TextStyle(
@@ -102,159 +178,255 @@ class _SideNavState extends State<SideNav> {
               ),
             ),
 
-            const Divider(color: Color(0xFF2F5DA8), thickness: 0.5),
+            const Divider(
+              color: Color(0xFF2F5DA8),
+              thickness: 0.5,
+            ),
 
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 children: [
-
+                  // DASHBOARD
                   _NavItem(
                     icon: Icons.dashboard_rounded,
                     label: "Dashboard",
                     onTap: () => Navigator.pop(context),
                   ),
 
+                  // PRODUCTS
                   _NavItem(
                     icon: Icons.shopping_bag_rounded,
                     label: "Products",
                     onTap: () {
                       Navigator.pop(context);
-                      Navigator.push(context,
-                          MaterialPageRoute(builder: (_) => const ProductScreen()));
+
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const ProductScreen(),
+                        ),
+                      );
                     },
                   ),
 
+                  // CATEGORIES
                   _NavItem(
                     icon: Icons.category_rounded,
                     label: "Categories",
                     onTap: () {
                       Navigator.pop(context);
-                      Navigator.push(context,
-                          MaterialPageRoute(builder: (_) => const CategoryScreen()));
+
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const CategoryScreen(),
+                        ),
+                      );
                     },
                   ),
 
+                  // SALES
                   _NavItem(
                     icon: Icons.receipt_long_rounded,
                     label: "Sales",
                     onTap: () {
                       Navigator.pop(context);
-                      Navigator.push(context,
-                          MaterialPageRoute(builder: (_) => const AdminSalesScreen()));
+
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const AdminSalesScreen(),
+                        ),
+                      );
                     },
                   ),
 
+                  // MY SHOPS
                   _NavItem(
                     icon: Icons.store_rounded,
                     label: "My Shops",
                     onTap: () {
                       Navigator.pop(context);
-                      Navigator.push(context,
-                          MaterialPageRoute(builder: (_) => const ShopScreen()));
+
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const ShopScreen(),
+                        ),
+                      );
                     },
                   ),
 
+                  // CUSTOMERS
                   _NavItem(
                     icon: Icons.people_outline,
                     label: "Customers",
                     onTap: () {
                       Navigator.pop(context);
-                      Navigator.push(context,
-                          MaterialPageRoute(builder: (_) => const CustomerScreen()));
+
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const CustomerScreen(),
+                        ),
+                      );
                     },
                   ),
 
-                  // INVOICE EXPANDABLE
+                  // ─────────────────────────────────────────────────────────
+                  // INVOICES
+                  // ─────────────────────────────────────────────────────────
+
                   _ExpandableNavItem(
                     icon: Icons.receipt_rounded,
                     label: "Invoices",
                     isExpanded: _invoiceExpanded,
-                    onTap: () => setState(() => _invoiceExpanded = !_invoiceExpanded),
+                    onTap: () {
+                      setState(() {
+                        _invoiceExpanded = !_invoiceExpanded;
+                      });
+                    },
                     children: [
                       _SubNavItem(
                         icon: Icons.list_alt_rounded,
                         label: "All Invoices",
                         onTap: () {
                           Navigator.pop(context);
-                          Navigator.push(context,
-                              MaterialPageRoute(builder: (_) => const InvoiceScreen()));
+
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const InvoiceScreen(),
+                            ),
+                          );
                         },
                       ),
+
                       _SubNavItem(
                         icon: Icons.add_circle_outline_rounded,
                         label: "Create Invoice",
                         onTap: () {
                           Navigator.pop(context);
-                          Navigator.push(context,
-                              MaterialPageRoute(builder: (_) => const CreateInvoiceScreen()));
+
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  const CreateInvoiceScreen(),
+                            ),
+                          );
                         },
                       ),
+
                       _SubNavItem(
                         icon: Icons.account_balance_wallet_rounded,
                         label: "Receivables",
                         onTap: () {
                           Navigator.pop(context);
-                          Navigator.push(context,
-                              MaterialPageRoute(builder: (_) => const ReceivablesScreen()));
+
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const ReceivablesScreen(),
+                            ),
+                          );
                         },
                       ),
                     ],
                   ),
 
-                  // PRODUCTION & MANUFACTURING EXPANDABLE
+                  // ─────────────────────────────────────────────────────────
+                  // PRODUCTION
+                  // ─────────────────────────────────────────────────────────
+
                   _ExpandableNavItem(
                     icon: Icons.precision_manufacturing_rounded,
                     label: "Production & Manufacturing",
                     isExpanded: _productionExpanded,
-                    onTap: () => setState(() => _productionExpanded = !_productionExpanded),
+                    onTap: () {
+                      setState(() {
+                        _productionExpanded = !_productionExpanded;
+                      });
+                    },
                     children: [
                       _SubNavItem(
                         icon: Icons.list_alt_rounded,
                         label: "Production Batches",
                         onTap: () {
                           Navigator.pop(context);
-                          Navigator.push(context,
-                              MaterialPageRoute(builder: (_) => const ProductionScreen()));
+
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const ProductionScreen(),
+                            ),
+                          );
                         },
                       ),
+
                       _SubNavItem(
                         icon: Icons.add_circle_outline_rounded,
                         label: "New Production",
                         onTap: () {
                           Navigator.pop(context);
-                          Navigator.push(context,
-                              MaterialPageRoute(builder: (_) => const ProductionCreateScreen()));
+
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  const ProductionCreateScreen(),
+                            ),
+                          );
                         },
                       ),
+
                       _SubNavItem(
                         icon: Icons.playlist_add_check_rounded,
                         label: "Production Entries",
                         onTap: () {
                           Navigator.pop(context);
-                          Navigator.push(context,
-                              MaterialPageRoute(builder: (_) => const ProductionEntryListScreen()));
+
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  const ProductionEntryListScreen(),
+                            ),
+                          );
                         },
                       ),
+
                       _SubNavItem(
                         icon: Icons.category_outlined,
                         label: "Production Types",
                         onTap: () {
                           Navigator.pop(context);
-                          Navigator.push(context,
-                              MaterialPageRoute(builder: (_) => const ProductionTypeScreen()));
+
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  const ProductionTypeScreen(),
+                            ),
+                          );
                         },
                       ),
                     ],
                   ),
 
-                  // REPORTS EXPANDABLE
+                  // ─────────────────────────────────────────────────────────
+                  // REPORTS
+                  // ─────────────────────────────────────────────────────────
+
                   _ExpandableNavItem(
                     icon: Icons.analytics_rounded,
                     label: "Reports",
                     isExpanded: _reportsExpanded,
                     onTap: () {
-                      setState(() => _reportsExpanded = !_reportsExpanded);
+                      setState(() {
+                        _reportsExpanded = !_reportsExpanded;
+                      });
                     },
                     children: [
                       _SubNavItem(
@@ -262,6 +434,7 @@ class _SideNavState extends State<SideNav> {
                         label: "Sales Report",
                         onTap: () {
                           Navigator.pop(context);
+
                           Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -276,6 +449,7 @@ class _SideNavState extends State<SideNav> {
                         label: "Profit Report",
                         onTap: () {
                           Navigator.pop(context);
+
                           Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -290,10 +464,12 @@ class _SideNavState extends State<SideNav> {
                         label: "Production Report",
                         onTap: () {
                           Navigator.pop(context);
+
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => const ProductionReportScreen(),
+                              builder: (_) =>
+                                  const ProductionReportScreen(),
                             ),
                           );
                         },
@@ -304,6 +480,7 @@ class _SideNavState extends State<SideNav> {
                         label: "Stock Report",
                         onTap: () {
                           Navigator.pop(context);
+
                           Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -315,31 +492,23 @@ class _SideNavState extends State<SideNav> {
                     ],
                   ),
 
-                  // _NavItem(
-                  //   icon: Icons.bar_chart_rounded,
-                  //   label: "Analytics",
-                  //   onTap: () => Navigator.pop(context),
-                  // ),
+                  // ─────────────────────────────────────────────────────────
+                  // NOTIFICATIONS
+                  // ─────────────────────────────────────────────────────────
 
-                  // _NavItem(
-                  //   icon: Icons.smart_toy_rounded,
-                  //   label: "AI Assistant",
-                  //   onTap: () => Navigator.pop(context),
-                  // ),
-
-                  // NOTIFICATIONS WITH BADGE
                   _NavItemWithBadge(
                     icon: Icons.notifications_rounded,
                     label: "Notifications",
                     badgeCount: unreadCount,
                     onTap: () {
                       Navigator.pop(context);
+
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                            builder: (_) => const NotificationScreen()),
+                          builder: (_) => const NotificationScreen(),
+                        ),
                       ).then((_) {
-                        // Refresh count after coming back from notification screen
                         context
                             .read<NotificationProvider>()
                             .fetchUnreadCount();
@@ -347,49 +516,90 @@ class _SideNavState extends State<SideNav> {
                     },
                   ),
 
-                  // USERS EXPANDABLE
+                  // ─────────────────────────────────────────────────────────
+                  // USERS
+                  // ─────────────────────────────────────────────────────────
+
                   _ExpandableNavItem(
                     icon: Icons.people_rounded,
                     label: "Users",
                     isExpanded: _usersExpanded,
-                    onTap: () => setState(() => _usersExpanded = !_usersExpanded),
+                    onTap: () {
+                      setState(() {
+                        _usersExpanded = !_usersExpanded;
+                      });
+                    },
                     children: [
                       _SubNavItem(
                         icon: Icons.manage_accounts_rounded,
                         label: "Manage Users",
                         onTap: () {
                           Navigator.pop(context);
-                          Navigator.push(context,
-                              MaterialPageRoute(builder: (_) => const ManageRolesScreen()));
+
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  const ManageRolesScreen(),
+                            ),
+                          );
                         },
                       ),
+
                       _SubNavItem(
                         icon: Icons.person_add_rounded,
                         label: "Register Staff",
                         onTap: () {
                           Navigator.pop(context);
-                          Navigator.push(context,
-                              MaterialPageRoute(builder: (_) => const RegisterStaffScreen()));
+
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  const RegisterStaffScreen(),
+                            ),
+                          );
                         },
                       ),
                     ],
                   ),
 
+                  // ─────────────────────────────────────────────────────────
+                  // STOCK TRANSFER
+                  // ─────────────────────────────────────────────────────────
+
+                  _NavItem(
+                    icon: Icons.swap_horiz_rounded,
+                    label: "Stock Transfer",
+                    onTap: _openStockTransfer,
+                  ),
+
                   const SizedBox(height: 16),
-                  const Divider(color: Color(0xFF2F5DA8), thickness: 0.5),
+
+                  const Divider(
+                    color: Color(0xFF2F5DA8),
+                    thickness: 0.5,
+                  ),
+
                   const SizedBox(height: 8),
+
+                  // ─────────────────────────────────────────────────────────
+                  // SETTINGS
+                  // ─────────────────────────────────────────────────────────
 
                   _NavItem(
                     icon: Icons.settings_rounded,
                     label: "Settings",
-                    onTap: () => Navigator.pop(context),
+                    onTap: _openSettings,
                   ),
 
+                  // PROFILE
                   _NavItem(
                     icon: Icons.person_outline_rounded,
                     label: "Profile",
                     onTap: () {
                       Navigator.pop(context);
+
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -399,16 +609,21 @@ class _SideNavState extends State<SideNav> {
                     },
                   ),
 
+                  // LOGOUT
                   _NavItem(
                     icon: Icons.logout_rounded,
                     label: "Logout",
                     isLogout: true,
                     onTap: () async {
                       await AuthService.logout();
+
                       if (!context.mounted) return;
+
                       Navigator.pushAndRemoveUntil(
                         context,
-                        MaterialPageRoute(builder: (_) => const LoginScreen()),
+                        MaterialPageRoute(
+                          builder: (_) => const LoginScreen(),
+                        ),
                         (route) => false,
                       );
                     },
@@ -425,7 +640,10 @@ class _SideNavState extends State<SideNav> {
   }
 }
 
-// ─── NAV ITEM WITH BADGE ──────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// NAV ITEM WITH BADGE
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _NavItemWithBadge extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -442,11 +660,18 @@ class _NavItemWithBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 2),
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: 24,
+        vertical: 2,
+      ),
       leading: Stack(
         clipBehavior: Clip.none,
         children: [
-          Icon(icon, color: const Color(0xFF8FAADC), size: 22),
+          Icon(
+            icon,
+            color: const Color(0xFF8FAADC),
+            size: 22,
+          ),
           if (badgeCount > 0)
             Positioned(
               top: -6,
@@ -457,7 +682,10 @@ class _NavItemWithBadge extends StatelessWidget {
                   color: Colors.redAccent,
                   shape: BoxShape.circle,
                 ),
-                constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                constraints: const BoxConstraints(
+                  minWidth: 16,
+                  minHeight: 16,
+                ),
                 child: Text(
                   badgeCount > 99 ? '99+' : '$badgeCount',
                   style: const TextStyle(
@@ -484,7 +712,10 @@ class _NavItemWithBadge extends StatelessWidget {
   }
 }
 
-// ─── REGULAR NAV ITEM ─────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// REGULAR NAV ITEM
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _NavItem extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -501,10 +732,15 @@ class _NavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 2),
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: 24,
+        vertical: 2,
+      ),
       leading: Icon(
         icon,
-        color: isLogout ? Colors.redAccent : const Color(0xFF8FAADC),
+        color: isLogout
+            ? Colors.redAccent
+            : const Color(0xFF8FAADC),
         size: 22,
       ),
       title: Text(
@@ -520,7 +756,10 @@ class _NavItem extends StatelessWidget {
   }
 }
 
-// ─── EXPANDABLE NAV ITEM ──────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// EXPANDABLE NAV ITEM
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _ExpandableNavItem extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -541,8 +780,15 @@ class _ExpandableNavItem extends StatelessWidget {
     return Column(
       children: [
         ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 2),
-          leading: Icon(icon, color: const Color(0xFF8FAADC), size: 22),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 24,
+            vertical: 2,
+          ),
+          leading: Icon(
+            icon,
+            color: const Color(0xFF8FAADC),
+            size: 22,
+          ),
           title: Text(
             label,
             style: const TextStyle(
@@ -562,10 +808,14 @@ class _ExpandableNavItem extends StatelessWidget {
           ),
           onTap: onTap,
         ),
+
         AnimatedCrossFade(
           firstChild: const SizedBox.shrink(),
           secondChild: Container(
-            margin: const EdgeInsets.only(left: 24, bottom: 4),
+            margin: const EdgeInsets.only(
+              left: 24,
+              bottom: 4,
+            ),
             decoration: BoxDecoration(
               border: Border(
                 left: BorderSide(
@@ -574,10 +824,13 @@ class _ExpandableNavItem extends StatelessWidget {
                 ),
               ),
             ),
-            child: Column(children: children),
+            child: Column(
+              children: children,
+            ),
           ),
-          crossFadeState:
-              isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+          crossFadeState: isExpanded
+              ? CrossFadeState.showSecond
+              : CrossFadeState.showFirst,
           duration: const Duration(milliseconds: 200),
         ),
       ],
@@ -585,7 +838,10 @@ class _ExpandableNavItem extends StatelessWidget {
   }
 }
 
-// ─── SUB NAV ITEM ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// SUB NAV ITEM
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _SubNavItem extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -600,8 +856,15 @@ class _SubNavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      contentPadding: const EdgeInsets.only(left: 20, right: 24),
-      leading: Icon(icon, color: const Color(0xFF8FAADC), size: 18),
+      contentPadding: const EdgeInsets.only(
+        left: 20,
+        right: 24,
+      ),
+      leading: Icon(
+        icon,
+        color: const Color(0xFF8FAADC),
+        size: 18,
+      ),
       title: Text(
         label,
         style: const TextStyle(

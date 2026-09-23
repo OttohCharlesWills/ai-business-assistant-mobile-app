@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import '../services/auth_service.dart';
 
 class ConnectivityWrapper extends StatefulWidget {
   final Widget child;
@@ -82,6 +83,88 @@ class _ConnectivityWrapperState extends State<ConnectivityWrapper> {
         child: Stack(
           children: [
             widget.child,
+
+            ValueListenableBuilder<Map<String, dynamic>?>(
+              valueListenable: AuthService.trialNotifier,
+              builder: (context, trial, _) {
+                if (trial == null) return const SizedBox.shrink();
+
+                final daysLeft = trial['days_left'] as int;
+                final expired = daysLeft <= 0;
+
+                return Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: IgnorePointer(
+                    ignoring: false,
+                    child: SafeArea(
+                      bottom: false,
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 10),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: expired
+                                ? [
+                                    const Color(0xFFFF3D00),
+                                    const Color(0xFFD50000),
+                                  ]
+                                : [
+                                    const Color(0xFFFF9800),
+                                    const Color(0xFFFF5722),
+                                  ],
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Colors.black26,
+                              blurRadius: 18,
+                              offset: Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            const Text("🚀", style: TextStyle(fontSize: 20)),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Text(
+                                    "Free Trial",
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      decoration: TextDecoration.none,
+                                    ),
+                                  ),
+                                  Text(
+                                    expired
+                                        ? "Expired"
+                                        : "$daysLeft day(s) left",
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                      decoration: TextDecoration.none,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
 
             if (!_isConnected)
               Positioned(
