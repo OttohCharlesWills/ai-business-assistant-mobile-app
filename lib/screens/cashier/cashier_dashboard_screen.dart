@@ -5,6 +5,7 @@ import '../../widgets/cashier_side_nav.dart';
 import '../../models/receipt_data.dart';
 import '../../services/auth_service.dart';
 import '../receipt_screen.dart';
+import 'package:flutter/foundation.dart';
 
 // Laravel returns decimal columns (like price) as STRINGS in JSON
 // unless the model casts them — this handles both String and num safely.
@@ -505,6 +506,7 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
     final customerPhoneController = TextEditingController();
     String paymentMethod = 'cash';
     bool submitting = false;
+    bool sheetOpen = true; // false once the sheet is closed, so we never touch it again
 
     showModalBottomSheet(
       context: context,
@@ -515,45 +517,54 @@ class _CashierDashboardScreenState extends State<CashierDashboardScreen> {
         return StatefulBuilder(
           builder: (context, setSheetState) {
             Future<void> completeSale() async {
-              if (_cart.isEmpty) return;
+              if (_cart.isEmpty || submitting) return;
               setSheetState(() => submitting = true);
 
-              final products = _cart
-                  .map((item) => {
-                        'product_id': item['product']['id'],
-                        'quantity': item['quantity'],
-                        'discount_type': item['discount_type'],
-                        'discount_value': item['discount_value'],
-                      })
-                  .toList();
+              try {
+                final products = _cart
+                    .map((item) => {
+                          'product_id': item['product']['id'],
+                          'quantity': item['quantity'],
+                          'discount_type': item['discount_type'],
+                          'discount_value': item['discount_value'],
+                        })
+                    .toList();
 
-              final result = await CashierDashboardService.createSale(
-                customerName: customerNameController.text.trim().isEmpty ? null : customerNameController.text.trim(),
-                customerPhone: customerPhoneController.text.trim().isEmpty ? null : customerPhoneController.text.trim(),
-                products: products,
-                paymentMethod: paymentMethod,
-              );
-
-              setSheetState(() => submitting = false);
-
-              if (result['success'] == true) {
-                if (!mounted) return;
-
-                // Build the receipt BEFORE the cart is cleared
-                final receipt = ReceiptData.fromCart(
-                  cart: _cart,
-                  transactionId: result['txn_id']?.toString(),
-                  cashierName: _cashierName,
-                  customerName: customerNameController.text,
-                  customerPhone: customerPhoneController.text,
+                final result = await CashierDashboardService.createSale(
+                  customerName: customerNameController.text.trim().isEmpty ? null : customerNameController.text.trim(),
+                  customerPhone: customerPhoneController.text.trim().isEmpty ? null : customerPhoneController.text.trim(),
+                  products: products,
                   paymentMethod: paymentMethod,
                 );
+                debugPrint('createSale result: $result');
 
-                Navigator.pop(sheetContext);
-                setState(() => _cart.clear());
-                _openReceipt(receipt);
-              } else {
+                if (result['success'] == true) {
+                  final receipt = ReceiptData.fromCart(
+                    cart: _cart,
+                    transactionId: result['txn_id']?.toString(),
+                    cashierName: _cashierName,
+                    customerName: customerNameController.text,
+                    customerPhone: customerPhoneController.text,
+                    paymentMethod: paymentMethod,
+                  );
+                  debugPrint('receipt built');
+
+                  sheetOpen = false;
+                  Navigator.pop(sheetContext);
+                  setState(() => _cart.clear());
+
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) _openReceipt(receipt);
+                  });
+                  return;
+                }
+
                 _showSnack(_extractMessage(result['message']) ?? 'Sale failed', isError: true);
+              } catch (e, st) {
+                debugPrint('completeSale crashed: $e\n$st');
+                _showSnack('Something went wrong completing the sale: $e', isError: true);
+              } finally {
+                if (sheetOpen) setSheetState(() => submitting = false);
               }
             }
 

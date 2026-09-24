@@ -5,7 +5,11 @@ import '../services/auth_service.dart';
 
 class ConnectivityWrapper extends StatefulWidget {
   final Widget child;
-  const ConnectivityWrapper({super.key, required this.child});
+
+  const ConnectivityWrapper({
+    super.key,
+    required this.child,
+  });
 
   @override
   State<ConnectivityWrapper> createState() => _ConnectivityWrapperState();
@@ -13,6 +17,7 @@ class ConnectivityWrapper extends StatefulWidget {
 
 class _ConnectivityWrapperState extends State<ConnectivityWrapper> {
   late StreamSubscription _subscription;
+
   bool _isConnected = true;
   bool _showRestored = false;
 
@@ -25,7 +30,7 @@ class _ConnectivityWrapperState extends State<ConnectivityWrapper> {
       _handleResult(result);
     });
 
-    // Listen for changes — works on both old and new devices
+    // Listen for connection changes
     _subscription = Connectivity().onConnectivityChanged.listen((result) {
       _handleResult(result);
     });
@@ -36,7 +41,9 @@ class _ConnectivityWrapperState extends State<ConnectivityWrapper> {
     bool connected;
 
     if (result is List) {
-      connected = result.any((r) => r != ConnectivityResult.none);
+      connected = result.any(
+        (r) => r != ConnectivityResult.none,
+      );
     } else {
       connected = result != ConnectivityResult.none;
     }
@@ -58,9 +65,14 @@ class _ConnectivityWrapperState extends State<ConnectivityWrapper> {
         _showRestored = true;
       });
 
-      Future.delayed(const Duration(seconds: 3), () {
-        if (mounted) setState(() => _showRestored = false);
-      });
+      Future.delayed(
+        const Duration(seconds: 3),
+        () {
+          if (mounted) {
+            setState(() => _showRestored = false);
+          }
+        },
+      );
     }
   }
 
@@ -72,10 +84,6 @@ class _ConnectivityWrapperState extends State<ConnectivityWrapper> {
 
   @override
   Widget build(BuildContext context) {
-    // This widget sits ABOVE MaterialApp, so nothing has supplied text
-    // direction or screen metrics yet. Provide both here.
-    //  - Directionality: required by Stack (and Row/Text below)
-    //  - MediaQuery.fromView: required by SafeArea inside the banner
     return Directionality(
       textDirection: TextDirection.ltr,
       child: MediaQuery.fromView(
@@ -84,10 +92,15 @@ class _ConnectivityWrapperState extends State<ConnectivityWrapper> {
           children: [
             widget.child,
 
+            // ==============================
+            // TRIAL BANNER
+            // ==============================
             ValueListenableBuilder<Map<String, dynamic>?>(
               valueListenable: AuthService.trialNotifier,
               builder: (context, trial, _) {
-                if (trial == null) return const SizedBox.shrink();
+                if (trial == null) {
+                  return const SizedBox.shrink();
+                }
 
                 final daysLeft = trial['days_left'] as int;
                 final expired = daysLeft <= 0;
@@ -97,67 +110,77 @@ class _ConnectivityWrapperState extends State<ConnectivityWrapper> {
                   left: 0,
                   right: 0,
                   child: IgnorePointer(
-                    ignoring: false,
                     child: SafeArea(
                       bottom: false,
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 10),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: expired
-                                ? [
-                                    const Color(0xFFFF3D00),
-                                    const Color(0xFFD50000),
-                                  ]
-                                : [
-                                    const Color(0xFFFF9800),
-                                    const Color(0xFFFF5722),
-                                  ],
+                      child: Center(
+                        child: Container(
+                          margin: const EdgeInsets.only(top: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
                           ),
-                          borderRadius: BorderRadius.circular(14),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Colors.black26,
-                              blurRadius: 18,
-                              offset: Offset(0, 4),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: expired
+                                  ? [
+                                      const Color(0xFFFF3D00),
+                                      const Color(0xFFD50000),
+                                    ]
+                                  : [
+                                      const Color(0xFFFF9800),
+                                      const Color(0xFFFF5722),
+                                    ],
                             ),
-                          ],
-                        ),
-                        child: Row(
-                          children: [
-                            const Text("🚀", style: TextStyle(fontSize: 20)),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Colors.black26,
+                                blurRadius: 14,
+                                offset: Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text(
+                                "🚀",
+                                style: TextStyle(
+                                  fontSize: 17,
+                                ),
+                              ),
+
+                              const SizedBox(width: 8),
+
+                              Column(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   const Text(
                                     "Free Trial",
                                     style: TextStyle(
                                       color: Colors.white,
-                                      fontSize: 14,
+                                      fontSize: 12,
                                       fontWeight: FontWeight.bold,
                                       decoration: TextDecoration.none,
                                     ),
                                   ),
+
                                   Text(
                                     expired
                                         ? "Expired"
                                         : "$daysLeft day(s) left",
                                     style: const TextStyle(
                                       color: Colors.white,
-                                      fontSize: 13,
+                                      fontSize: 11,
                                       decoration: TextDecoration.none,
                                     ),
                                   ),
                                 ],
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -166,6 +189,9 @@ class _ConnectivityWrapperState extends State<ConnectivityWrapper> {
               },
             ),
 
+            // ==============================
+            // NO INTERNET BANNER
+            // ==============================
             if (!_isConnected)
               Positioned(
                 bottom: 0,
@@ -180,6 +206,9 @@ class _ConnectivityWrapperState extends State<ConnectivityWrapper> {
                 ),
               ),
 
+            // ==============================
+            // INTERNET RESTORED BANNER
+            // ==============================
             if (_isConnected && _showRestored)
               Positioned(
                 bottom: 0,
@@ -223,17 +252,22 @@ class _BannerState extends State<_Banner>
   @override
   void initState() {
     super.initState();
+
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
+
     _slide = Tween<Offset>(
       begin: const Offset(0, 1),
       end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOut,
-    ));
+    ).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Curves.easeOut,
+      ),
+    );
+
     _controller.forward();
   }
 
@@ -249,22 +283,29 @@ class _BannerState extends State<_Banner>
       position: _slide,
       child: Container(
         color: widget.color,
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+        padding: const EdgeInsets.symmetric(
+          vertical: 10,
+          horizontal: 16,
+        ),
         child: SafeArea(
           top: false,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(widget.icon, color: Colors.white, size: 18),
+              Icon(
+                widget.icon,
+                color: Colors.white,
+                size: 18,
+              ),
+
               const SizedBox(width: 8),
+
               Text(
                 widget.message,
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
-                  // No Material ancestor up here, so without this Flutter
-                  // draws its yellow double underline under the text.
                   decoration: TextDecoration.none,
                 ),
               ),

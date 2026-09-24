@@ -1,6 +1,10 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 
 import '../../../services/stock_transfer_service.dart';
+import '../../../services/plan_access_service.dart';
+import '../../subscription_screen.dart';
 
 class StockTransferScreen extends StatefulWidget {
   final String baseUrl;
@@ -31,8 +35,6 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
       TextEditingController();
 
   List<dynamic> _shops = [];
-  List<dynamic> _products = [];
-
   List<dynamic> _sourceProducts = [];
 
   int? _sourceShopId;
@@ -42,15 +44,23 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
   dynamic _selectedProduct;
 
   bool _loading = true;
+  bool _checkingAccess = true;
+  bool _hasAccess = false;
   bool _loadingProducts = false;
   bool _transferring = false;
 
   String? _errorMessage;
 
+  static const Color _backgroundColor = Color(0xFF0C1F3F);
+  static const Color _cardColor = Color(0xFF0F2847);
+  static const Color _primaryColor = Color(0xFF2F5DA8);
+  static const Color _secondaryText = Color(0xFF8FAADC);
+  static const Color _inputColor = Color(0xFF102D50);
+
   @override
   void initState() {
     super.initState();
-    _loadShops();
+    _checkPlanAccess();
   }
 
   @override
@@ -62,10 +72,52 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
   }
 
   // ---------------------------------------------------------------------------
+  // CHECK PLAN ACCESS
+  // ---------------------------------------------------------------------------
+
+  Future<void> _checkPlanAccess() async {
+    setState(() {
+      _checkingAccess = true;
+      _loading = true;
+    });
+
+    try {
+      final allowed = await PlanAccessService.hasFeature(
+        'stock_transfer',
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _hasAccess = allowed;
+        _checkingAccess = false;
+      });
+
+      if (allowed) {
+        await _loadShops();
+      } else {
+        setState(() {
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _hasAccess = false;
+        _checkingAccess = false;
+        _loading = false;
+      });
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // LOAD SHOPS
   // ---------------------------------------------------------------------------
 
   Future<void> _loadShops() async {
+    if (!_hasAccess) return;
+
     setState(() {
       _loading = true;
       _errorMessage = null;
@@ -98,6 +150,8 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
   // ---------------------------------------------------------------------------
 
   Future<void> _loadProductsForShop(int shopId) async {
+    if (!_hasAccess) return;
+
     setState(() {
       _loadingProducts = true;
       _sourceProducts = [];
@@ -134,6 +188,8 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
   // ---------------------------------------------------------------------------
 
   void _selectProduct(int? productId) {
+    if (!_hasAccess) return;
+
     if (productId == null) {
       setState(() {
         _productId = null;
@@ -170,6 +226,11 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
   // ---------------------------------------------------------------------------
 
   Future<void> _transferStock() async {
+    if (!_hasAccess) {
+      _showUpgradeMessage();
+      return;
+    }
+
     FocusScope.of(context).unfocus();
 
     if (!_formKey.currentState!.validate()) {
@@ -288,6 +349,19 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
   }
 
   // ---------------------------------------------------------------------------
+  // OPEN SUBSCRIPTION SCREEN
+  // ---------------------------------------------------------------------------
+
+  void _openSubscriptionScreen() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const SubscriptionScreen(),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
   // HELPERS
   // ---------------------------------------------------------------------------
 
@@ -327,6 +401,7 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
       SnackBar(
         content: Text(message),
         behavior: SnackBarBehavior.floating,
+        backgroundColor: Colors.redAccent,
       ),
     );
   }
@@ -338,7 +413,22 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
       SnackBar(
         content: Text(message),
         behavior: SnackBarBehavior.floating,
+        backgroundColor: _primaryColor,
         duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  void _showUpgradeMessage() {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Please upgrade your plan to access this feature.',
+        ),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: _primaryColor,
       ),
     );
   }
@@ -350,52 +440,208 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F8FA),
+      backgroundColor: _backgroundColor,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF0C1F3F),
+        backgroundColor: _backgroundColor,
+        foregroundColor: Colors.white,
+        centerTitle: false,
         title: const Text(
           'Stock Transfer',
           style: TextStyle(
+            color: Colors.white,
             fontWeight: FontWeight.w700,
           ),
         ),
+        iconTheme: const IconThemeData(
+          color: Colors.white,
+        ),
       ),
-      body: _loading
+      body: _checkingAccess
           ? const Center(
               child: CircularProgressIndicator(
-                color: Color(0xFF2F5DA8),
+                color: _primaryColor,
               ),
             )
-          : RefreshIndicator(
-              onRefresh: _loadShops,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(20),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
-                    children: [
-                      _buildHeader(),
+          : Stack(
+              children: [
+                _buildPageContent(),
 
-                      const SizedBox(height: 24),
+                if (!_hasAccess) _buildLockedOverlay(),
+              ],
+            ),
+    );
+  }
 
-                      _buildTransferCard(),
+  // ---------------------------------------------------------------------------
+  // PAGE CONTENT
+  // ---------------------------------------------------------------------------
 
-                      if (_errorMessage != null) ...[
-                        const SizedBox(height: 16),
-                        _buildErrorBox(),
+  Widget _buildPageContent() {
+    if (_loading) {
+      return const Center(
+        child: CircularProgressIndicator(
+          color: _primaryColor,
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _hasAccess
+          ? _loadShops
+          : () async {},
+      color: _primaryColor,
+      backgroundColor: _cardColor,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(20),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment:
+                CrossAxisAlignment.start,
+            children: [
+              _buildHeader(),
+
+              const SizedBox(height: 24),
+
+              _buildTransferCard(),
+
+              if (_errorMessage != null) ...[
+                const SizedBox(height: 16),
+                _buildErrorBox(),
+              ],
+
+              const SizedBox(height: 30),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // LOCK OVERLAY
+  // ---------------------------------------------------------------------------
+
+  Widget _buildLockedOverlay() {
+    return Positioned.fill(
+      child: AbsorbPointer(
+        absorbing: true,
+        child: ClipRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(
+              sigmaX: 3,
+              sigmaY: 3,
+            ),
+            child: Container(
+              color: _backgroundColor.withOpacity(0.72),
+              child: Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: Container(
+                    width: 420,
+                    padding: const EdgeInsets.all(28),
+                    decoration: BoxDecoration(
+                      color: _cardColor,
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(
+                        color: _primaryColor.withOpacity(0.35),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.35),
+                          blurRadius: 30,
+                          offset: const Offset(0, 15),
+                        ),
                       ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 68,
+                          height: 68,
+                          decoration: BoxDecoration(
+                            color: _primaryColor.withOpacity(0.16),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.lock_rounded,
+                            color: Color(0xFF8FAADC),
+                            size: 32,
+                          ),
+                        ),
 
-                      const SizedBox(height: 30),
-                    ],
+                        const SizedBox(height: 20),
+
+                        const Text(
+                          'Stock Transfer Locked',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 21,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+
+                        const SizedBox(height: 10),
+
+                        const Text(
+                          'Please upgrade your plan to access this feature.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: _secondaryText,
+                            fontSize: 14,
+                            height: 1.6,
+                          ),
+                        ),
+
+                        const SizedBox(height: 24),
+
+                        SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: ElevatedButton(
+                            onPressed: _openSubscriptionScreen,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _primaryColor,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius:
+                                    BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisAlignment:
+                                  MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.workspace_premium_rounded,
+                                  size: 20,
+                                ),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Upgrade Plan',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -412,16 +658,16 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.w800,
-            color: Color(0xFF0C1F3F),
+            color: Colors.white,
           ),
         ),
         const SizedBox(height: 7),
-        Text(
+        const Text(
           'Transfer products from one shop to another without losing track of your inventory.',
           style: TextStyle(
             fontSize: 14,
             height: 1.5,
-            color: Colors.grey.shade600,
+            color: _secondaryText,
           ),
         ),
       ],
@@ -437,10 +683,10 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _cardColor,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: Colors.grey.shade200,
+          color: _primaryColor.withOpacity(0.20),
         ),
       ),
       child: Column(
@@ -515,7 +761,8 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
           _buildTextField(
             controller: _costPriceController,
             hint: 'Enter cost price',
-            keyboardType: const TextInputType.numberWithOptions(
+            keyboardType:
+                const TextInputType.numberWithOptions(
               decimal: true,
             ),
             prefixIcon: Icons.money_outlined,
@@ -543,7 +790,8 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
           _buildTextField(
             controller: _sellingPriceController,
             hint: 'Enter selling price',
-            keyboardType: const TextInputType.numberWithOptions(
+            keyboardType:
+                const TextInputType.numberWithOptions(
               decimal: true,
             ),
             prefixIcon: Icons.sell_outlined,
@@ -578,6 +826,11 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
     return DropdownButtonFormField<int>(
       value: _sourceShopId,
       isExpanded: true,
+      dropdownColor: _cardColor,
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 14,
+      ),
       decoration: _inputDecoration(
         hint: 'Select source shop',
         prefixIcon: Icons.store_outlined,
@@ -596,7 +849,7 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
         );
       }).toList(),
       onChanged: (value) {
-        if (value == null) return;
+        if (value == null || !_hasAccess) return;
 
         setState(() {
           _sourceShopId = value;
@@ -623,10 +876,13 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
     if (_loadingProducts) {
       return Container(
         height: 56,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.symmetric(
+          horizontal: 16,
+        ),
         decoration: BoxDecoration(
+          color: _inputColor,
           border: Border.all(
-            color: Colors.grey.shade300,
+            color: _primaryColor.withOpacity(0.25),
           ),
           borderRadius: BorderRadius.circular(12),
         ),
@@ -637,11 +893,16 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
               height: 20,
               child: CircularProgressIndicator(
                 strokeWidth: 2,
-                color: Color(0xFF2F5DA8),
+                color: _primaryColor,
               ),
             ),
             SizedBox(width: 12),
-            Text('Loading products...'),
+            Text(
+              'Loading products...',
+              style: TextStyle(
+                color: _secondaryText,
+              ),
+            ),
           ],
         ),
       );
@@ -650,6 +911,11 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
     return DropdownButtonFormField<int>(
       value: _productId,
       isExpanded: true,
+      dropdownColor: _cardColor,
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 14,
+      ),
       decoration: _inputDecoration(
         hint: _sourceShopId == null
             ? 'Select a source shop first'
@@ -674,7 +940,8 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
         },
       ).toList(),
       onChanged: _sourceShopId == null ||
-              _sourceProducts.isEmpty
+              _sourceProducts.isEmpty ||
+              !_hasAccess
           ? null
           : _selectProduct,
       validator: (value) {
@@ -703,11 +970,17 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
     return DropdownButtonFormField<int>(
       value: _destinationShopId,
       isExpanded: true,
+      dropdownColor: _cardColor,
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 14,
+      ),
       decoration: _inputDecoration(
         hint: _sourceShopId == null
             ? 'Select source shop first'
             : 'Select destination shop',
-        prefixIcon: Icons.store_mall_directory_outlined,
+        prefixIcon:
+            Icons.store_mall_directory_outlined,
       ),
       items: availableShops.map<DropdownMenuItem<int>>(
         (shop) {
@@ -724,7 +997,7 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
           );
         },
       ).toList(),
-      onChanged: _sourceShopId == null
+      onChanged: _sourceShopId == null || !_hasAccess
           ? null
           : (value) {
               setState(() {
@@ -755,20 +1028,24 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
         vertical: 12,
       ),
       decoration: BoxDecoration(
-        color: const Color(0xFFF0F5FC),
+        color: _primaryColor.withOpacity(0.12),
         borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: _primaryColor.withOpacity(0.15),
+        ),
       ),
       child: Row(
         children: [
           const Icon(
             Icons.inventory_2_outlined,
             size: 20,
-            color: Color(0xFF2F5DA8),
+            color: Color(0xFF8FAADC),
           ),
           const SizedBox(width: 10),
           const Text(
             'Available stock:',
             style: TextStyle(
+              color: Colors.white,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -777,7 +1054,7 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
             stock.toString(),
             style: const TextStyle(
               fontWeight: FontWeight.w800,
-              color: Color(0xFF2F5DA8),
+              color: Color(0xFF8FAADC),
             ),
           ),
         ],
@@ -798,10 +1075,10 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
             ? null
             : _transferStock,
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF2F5DA8),
+          backgroundColor: _primaryColor,
           foregroundColor: Colors.white,
           disabledBackgroundColor:
-              const Color(0xFF2F5DA8).withOpacity(.55),
+              _primaryColor.withOpacity(.55),
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
@@ -817,7 +1094,8 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
                 ),
               )
             : const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisAlignment:
+                    MainAxisAlignment.center,
                 children: [
                   Icon(Icons.swap_horiz_rounded),
                   SizedBox(width: 8),
@@ -843,25 +1121,26 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.red.withOpacity(.06),
+        color: Colors.redAccent.withOpacity(.08),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: Colors.red.withOpacity(.15),
+          color: Colors.redAccent.withOpacity(.20),
         ),
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
         children: [
           const Icon(
             Icons.error_outline,
-            color: Colors.red,
+            color: Colors.redAccent,
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               _errorMessage!,
               style: const TextStyle(
-                color: Colors.red,
+                color: Colors.redAccent,
                 height: 1.4,
               ),
             ),
@@ -885,12 +1164,12 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: const Color(0xFF2F5DA8).withOpacity(.10),
+            color: _primaryColor.withOpacity(.16),
             borderRadius: BorderRadius.circular(10),
           ),
-          child: const Icon(
-            Icons.swap_horiz_rounded,
-            color: Color(0xFF2F5DA8),
+          child: Icon(
+            icon,
+            color: const Color(0xFF8FAADC),
           ),
         ),
         const SizedBox(width: 12),
@@ -899,7 +1178,7 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
           style: const TextStyle(
             fontSize: 17,
             fontWeight: FontWeight.w800,
-            color: Color(0xFF0C1F3F),
+            color: Colors.white,
           ),
         ),
       ],
@@ -916,7 +1195,7 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
       style: const TextStyle(
         fontSize: 13,
         fontWeight: FontWeight.w700,
-        color: Color(0xFF26354D),
+        color: Color(0xFFB7C8E5),
       ),
     );
   }
@@ -936,6 +1215,10 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
       controller: controller,
       keyboardType: keyboardType,
       validator: validator,
+      style: const TextStyle(
+        color: Colors.white,
+      ),
+      cursorColor: _primaryColor,
       decoration: _inputDecoration(
         hint: hint,
         prefixIcon: prefixIcon,
@@ -953,17 +1236,17 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
   }) {
     return InputDecoration(
       hintText: hint,
-      hintStyle: TextStyle(
-        color: Colors.grey.shade500,
+      hintStyle: const TextStyle(
+        color: Color(0xFF6F88AD),
         fontSize: 14,
       ),
       prefixIcon: Icon(
         prefixIcon,
-        color: Colors.grey.shade600,
+        color: const Color(0xFF8FAADC),
         size: 21,
       ),
       filled: true,
-      fillColor: const Color(0xFFFAFBFC),
+      fillColor: _inputColor,
       contentPadding: const EdgeInsets.symmetric(
         horizontal: 14,
         vertical: 16,
@@ -971,34 +1254,37 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(
-          color: Colors.grey.shade300,
+          color: _primaryColor.withOpacity(0.20),
         ),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(
-          color: Colors.grey.shade300,
+          color: _primaryColor.withOpacity(0.20),
         ),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(
-          color: Color(0xFF2F5DA8),
+          color: _primaryColor,
           width: 1.5,
         ),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(
-          color: Colors.red,
+          color: Colors.redAccent,
         ),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(
-          color: Colors.red,
+          color: Colors.redAccent,
           width: 1.5,
         ),
+      ),
+      errorStyle: const TextStyle(
+        color: Colors.redAccent,
       ),
     );
   }

@@ -1,8 +1,28 @@
 import 'dart:convert';
 
 import 'api_client.dart';
+import 'plan_access_service.dart';
 
 class StockTransferService {
+  /*
+  |--------------------------------------------------------------------------
+  | Check Stock Transfer Access
+  |--------------------------------------------------------------------------
+  */
+
+  Future<void> _checkAccess() async {
+    final allowed = await PlanAccessService.hasFeature(
+      'stock_transfer',
+    );
+
+    if (!allowed) {
+      throw Exception(
+        'Your current plan does not include Stock Transfer. '
+        'Please upgrade your plan to access this feature.',
+      );
+    }
+  }
+
   /*
   |--------------------------------------------------------------------------
   | Get Shops
@@ -13,6 +33,8 @@ class StockTransferService {
     required String baseUrl,
     required String token,
   }) async {
+    await _checkAccess();
+
     final response = await get(
       Uri.parse('$baseUrl/stock-transfers/shops'),
       headers: {
@@ -42,6 +64,8 @@ class StockTransferService {
     required String baseUrl,
     required String token,
   }) async {
+    await _checkAccess();
+
     final response = await get(
       Uri.parse('$baseUrl/stock-transfers/products'),
       headers: {
@@ -71,6 +95,8 @@ class StockTransferService {
     required String baseUrl,
     required String token,
   }) async {
+    await _checkAccess();
+
     final response = await get(
       Uri.parse('$baseUrl/stock-transfers/categories'),
       headers: {
@@ -101,6 +127,8 @@ class StockTransferService {
     required String token,
     required int shopId,
   }) async {
+    await _checkAccess();
+
     final response = await get(
       Uri.parse('$baseUrl/shops/$shopId/products'),
       headers: {
@@ -136,6 +164,8 @@ class StockTransferService {
     required double costPrice,
     required double sellingPrice,
   }) async {
+    await _checkAccess();
+
     final response = await post(
       Uri.parse('$baseUrl/stock-transfers'),
       headers: {
@@ -161,6 +191,20 @@ class StockTransferService {
 
     /*
     |--------------------------------------------------------------------------
+    | Feature restriction from Laravel
+    |--------------------------------------------------------------------------
+    */
+
+    if (response.statusCode == 403) {
+      throw Exception(
+        data['message'] ??
+            'Your current plan does not include Stock Transfer. '
+                'Please upgrade your plan.',
+      );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | Laravel validation errors
     |--------------------------------------------------------------------------
     */
@@ -170,7 +214,9 @@ class StockTransferService {
         final errors = data['errors'] as Map<String, dynamic>;
 
         final messages = errors.values
-            .expand((value) => value is List ? value : [value])
+            .expand(
+              (value) => value is List ? value : [value],
+            )
             .map((value) => value.toString())
             .toList();
 

@@ -52,33 +52,57 @@ class ShopService {
   }
 
   // CREATE SHOP
-  static Future createShop({
-    required String name,
-    String? location,
-  }) async {
-    final token = await AuthService.getToken();
+  // CREATE SHOP
+static Future<Map<String, dynamic>> createShop({
+  required String name,
+  String? location,
+}) async {
+  final token = await AuthService.getToken();
 
-    final response = await http.post(
-      Uri.parse("$baseUrl/shops"),
-      headers: {
-        "Accept": "application/json",
-        "Authorization": "Bearer $token",
-      },
-      body: {
-        "name": name,
-        "location": location ?? "",
-      },
-    );
+  final response = await http.post(
+    Uri.parse("$baseUrl/shops"),
+    headers: {
+      "Accept": "application/json",
+      "Authorization": "Bearer $token",
+    },
+    body: {
+      "name": name,
+      "location": location ?? "",
+    },
+  );
 
-    final result = jsonDecode(response.body);
+  final result = jsonDecode(response.body);
 
-    // UPDATE CACHE
-    if (result['status'] == true) {
-      await refreshShops();
-    }
-
-    return result;
+  // PLAN RESTRICTION
+  if (response.statusCode == 403) {
+    return {
+      "status": false,
+      "restricted": true,
+      "message": result["message"] ??
+          "Your current plan does not allow you to create another shop.",
+    };
   }
+
+  // OTHER API ERROR
+  if (response.statusCode < 200 || response.statusCode >= 300) {
+    return {
+      "status": false,
+      "restricted": false,
+      "message": result["message"] ??
+          "Unable to create shop. Please try again.",
+    };
+  }
+
+  // SUCCESS
+  if (result['status'] == true) {
+    await refreshShops();
+  }
+
+  return {
+    ...result,
+    "restricted": false,
+  };
+}
 
   // UPDATE SHOP
   static Future updateShop({

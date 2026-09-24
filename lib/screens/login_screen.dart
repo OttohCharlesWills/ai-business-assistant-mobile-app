@@ -4,7 +4,7 @@ import '../helpers/role_router.dart';
 import '../widgets/app_loader.dart';
 import '../services/fcm_service.dart';
 import 'register_screen.dart';
-import 'verify_email_screen.dart';
+import 'email_verification_screen.dart';
 import '../helpers/error_message.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -15,7 +15,6 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
 
@@ -26,48 +25,74 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => loading = true);
 
     try {
-      await AuthService.saveLastEmail(emailController.text.trim()); 
+      await AuthService.saveLastEmail(
+        emailController.text.trim(),
+      );
 
       final response = await AuthService.login(
         email: emailController.text.trim(),
         password: passwordController.text,
       );
 
+      if (!mounted) return;
+
       setState(() => loading = false);
 
       final success = response['status'] == true;
-      final message = response['message'] ?? "Something went wrong";
-
-      if (!mounted) return;
+      final message =
+          response['message'] ?? "Something went wrong";
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message)),
       );
 
       if (success) {
-        await FCMService.init(); // ✅ init FCM + send token to backend
+        await FCMService.init();
+
         if (!mounted) return;
 
-        final emailVerified = response['email_verified'] ?? true;
+        final emailVerified =
+            response['email_verified'] ?? true;
+
+        // =========================================================
+        // EMAIL NOT VERIFIED
+        // =========================================================
 
         if (!emailVerified) {
+          final userEmail =
+              response['user']?['email'] ??
+              emailController.text.trim();
+
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (_) => const VerifyEmailScreen()),
+            MaterialPageRoute(
+              builder: (_) => EmailVerificationScreen(
+                email: userEmail,
+              ),
+            ),
           );
+
           return;
         }
 
-        RoleRouter.navigateFromResponse(context, response);
+        // =========================================================
+        // EMAIL VERIFIED
+        // =========================================================
+
+        RoleRouter.navigateFromResponse(
+          context,
+          response,
+        );
       }
-
     } catch (e) {
-      setState(() => loading = false);
-
       if (!mounted) return;
 
+      setState(() => loading = false);
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(friendlyError(e))),
+        SnackBar(
+          content: Text(friendlyError(e)),
+        ),
       );
     }
   }
@@ -75,62 +100,117 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> googleLogin() async {
     setState(() => loading = true);
 
-    final response = await AuthService.googleLogin();
+    try {
+      final response = await AuthService.googleLogin();
 
-    setState(() => loading = false);
-
-    final success = response['status'] == true;
-
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(friendlyError(response['message'] ?? 'Something went wrong'))),
-    );
-
-    if (success) {
-      await FCMService.init(); // ✅ init FCM + send token to backend
       if (!mounted) return;
 
-      final emailVerified = response['email_verified'] ?? true;
+      setState(() => loading = false);
 
-      if (!emailVerified) {
-        Navigator.pushReplacement(
+      final success = response['status'] == true;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            friendlyError(
+              response['message'] ??
+                  'Something went wrong',
+            ),
+          ),
+        ),
+      );
+
+      if (success) {
+        await FCMService.init();
+
+        if (!mounted) return;
+
+        final emailVerified =
+            response['email_verified'] ?? true;
+
+        // =========================================================
+        // GOOGLE ACCOUNT EMAIL NOT VERIFIED
+        // =========================================================
+
+        if (!emailVerified) {
+          final userEmail =
+              response['user']?['email'] ?? '';
+
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => EmailVerificationScreen(
+                email: userEmail,
+              ),
+            ),
+          );
+
+          return;
+        }
+
+        // =========================================================
+        // GOOGLE ACCOUNT EMAIL VERIFIED
+        // =========================================================
+
+        RoleRouter.navigateFromResponse(
           context,
-          MaterialPageRoute(builder: (_) => const VerifyEmailScreen()),
+          response,
         );
-        return;
       }
+    } catch (e) {
+      if (!mounted) return;
 
-      RoleRouter.navigateFromResponse(context, response);
+      setState(() => loading = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            friendlyError(e),
+          ),
+        ),
+      );
     }
+  }
+
+  @override
+  void dispose() {
+    emailController.dispose();
+    passwordController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0C1F3F),
-
       body: SafeArea(
         child: SingleChildScrollView(
           child: Column(
             children: [
-
               // HEADER
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(24, 40, 24, 30),
+                padding: const EdgeInsets.fromLTRB(
+                  24,
+                  40,
+                  24,
+                  30,
+                ),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
                   children: [
-
                     GestureDetector(
-                      onTap: () => Navigator.pop(context),
+                      onTap: () =>
+                          Navigator.pop(context),
                       child: Container(
                         width: 42,
                         height: 42,
                         decoration: BoxDecoration(
-                          color: const Color(0xFF2F5DA8).withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(12),
+                          color: const Color(0xFF2F5DA8)
+                              .withOpacity(0.2),
+                          borderRadius:
+                              BorderRadius.circular(12),
                         ),
                         child: const Icon(
                           Icons.arrow_back_rounded,
@@ -144,7 +224,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
                     if (loading)
                       const Padding(
-                        padding: EdgeInsets.only(bottom: 20),
+                        padding: EdgeInsets.only(
+                          bottom: 20,
+                        ),
                         child: AppLoader(size: 56),
                       ),
 
@@ -154,14 +236,17 @@ class _LoginScreenState extends State<LoginScreen> {
                         height: 56,
                         decoration: BoxDecoration(
                           color: const Color(0xFF2F5DA8),
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius:
+                              BorderRadius.circular(16),
                         ),
                         child: Image.asset(
                           'assets/icon/icon.png',
                           width: 60,
                           height: 60,
                           fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => const Icon(
+                          errorBuilder:
+                              (_, __, ___) =>
+                                  const Icon(
                             Icons.smart_toy_rounded,
                             size: 60,
                             color: Colors.white,
@@ -184,7 +269,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
                     const Text(
                       "Login to continue managing your business",
-                      style: TextStyle(color: Color(0xFF8FAADC)),
+                      style: TextStyle(
+                        color: Color(0xFF8FAADC),
+                      ),
                     ),
                   ],
                 ),
@@ -203,46 +290,73 @@ class _LoginScreenState extends State<LoginScreen> {
                 padding: const EdgeInsets.all(28),
                 child: Column(
                   children: [
-
                     _buildField(
                       controller: emailController,
                       hint: "Email Address",
                       icon: Icons.email_outlined,
-                      type: TextInputType.emailAddress,
+                      type:
+                          TextInputType.emailAddress,
                     ),
 
                     const SizedBox(height: 16),
 
                     Container(
                       decoration: BoxDecoration(
-                        color: const Color(0xFF0C1F3F),
-                        borderRadius: BorderRadius.circular(14),
+                        color:
+                            const Color(0xFF0C1F3F),
+                        borderRadius:
+                            BorderRadius.circular(14),
                       ),
                       child: TextField(
-                        controller: passwordController,
+                        controller:
+                            passwordController,
                         obscureText: obscure,
-                        style: const TextStyle(color: Colors.white, fontSize: 15),
-                        decoration: InputDecoration(
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                        ),
+                        decoration:
+                            InputDecoration(
                           hintText: "Password",
-                          hintStyle: const TextStyle(
-                            color: Color(0xFF8FAADC),
+                          hintStyle:
+                              const TextStyle(
+                            color:
+                                Color(0xFF8FAADC),
                             fontSize: 15,
                           ),
-                          prefixIcon: const Icon(
+                          prefixIcon:
+                              const Icon(
                             Icons.lock_outline,
-                            color: Color(0xFF8FAADC),
+                            color:
+                                Color(0xFF8FAADC),
                             size: 20,
                           ),
-                          suffixIcon: IconButton(
-                            onPressed: () => setState(() => obscure = !obscure),
+                          suffixIcon:
+                              IconButton(
+                            onPressed: () {
+                              setState(
+                                () => obscure =
+                                    !obscure,
+                              );
+                            },
                             icon: Icon(
-                              obscure ? Icons.visibility_off : Icons.visibility,
-                              color: const Color(0xFF8FAADC),
+                              obscure
+                                  ? Icons
+                                      .visibility_off
+                                  : Icons
+                                      .visibility,
+                              color:
+                                  const Color(
+                                0xFF8FAADC,
+                              ),
                               size: 20,
                             ),
                           ),
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
+                          border:
+                              InputBorder.none,
+                          contentPadding:
+                              const EdgeInsets
+                                  .symmetric(
                             horizontal: 16,
                             vertical: 18,
                           ),
@@ -256,22 +370,35 @@ class _LoginScreenState extends State<LoginScreen> {
                       width: double.infinity,
                       height: 56,
                       child: ElevatedButton(
-                        onPressed: loading ? null : login,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2F5DA8),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+                        onPressed:
+                            loading ? null : login,
+                        style:
+                            ElevatedButton.styleFrom(
+                          backgroundColor:
+                              const Color(
+                            0xFF2F5DA8,
+                          ),
+                          shape:
+                              RoundedRectangleBorder(
+                            borderRadius:
+                                BorderRadius.circular(
+                              16,
+                            ),
                           ),
                           elevation: 0,
                         ),
                         child: loading
-                            ? const AppLoader(size: 28)
+                            ? const AppLoader(
+                                size: 28,
+                              )
                             : const Text(
                                 "Login",
                                 style: TextStyle(
-                                  color: Colors.white,
+                                  color:
+                                      Colors.white,
                                   fontSize: 16,
-                                  fontWeight: FontWeight.w600,
+                                  fontWeight:
+                                      FontWeight.w600,
                                 ),
                               ),
                       ),
@@ -280,44 +407,72 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 16),
 
                     OutlinedButton.icon(
-                      onPressed: loading ? null : googleLogin,
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(double.infinity, 56),
-                        side: BorderSide(
-                          color: const Color(0xFF2F5DA8).withOpacity(0.5),
+                      onPressed:
+                          loading
+                              ? null
+                              : googleLogin,
+                      style:
+                          OutlinedButton.styleFrom(
+                        minimumSize:
+                            const Size(
+                          double.infinity,
+                          56,
                         ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
+                        side: BorderSide(
+                          color: const Color(
+                            0xFF2F5DA8,
+                          ).withOpacity(0.5),
+                        ),
+                        shape:
+                            RoundedRectangleBorder(
+                          borderRadius:
+                              BorderRadius.circular(
+                            16,
+                          ),
                         ),
                       ),
-                      icon: const Icon(Icons.g_mobiledata, color: Color(0xFF8FAADC)),
+                      icon: const Icon(
+                        Icons.g_mobiledata,
+                        color:
+                            Color(0xFF8FAADC),
+                      ),
                       label: const Text(
                         "Continue with Google",
-                        style: TextStyle(color: Color(0xFF8FAADC)),
+                        style: TextStyle(
+                          color:
+                              Color(0xFF8FAADC),
+                        ),
                       ),
                     ),
 
                     const SizedBox(height: 20),
 
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisAlignment:
+                          MainAxisAlignment.center,
                       children: [
                         const Text(
                           "No account?",
-                          style: TextStyle(color: Color(0xFF8FAADC)),
+                          style: TextStyle(
+                            color:
+                                Color(0xFF8FAADC),
+                          ),
                         ),
                         TextButton(
                           onPressed: () {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) => const RegisterScreen(),
+                                builder: (_) =>
+                                    const RegisterScreen(),
                               ),
                             );
                           },
                           child: const Text(
                             "Register",
-                            style: TextStyle(color: Colors.white),
+                            style: TextStyle(
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                       ],
@@ -336,23 +491,36 @@ class _LoginScreenState extends State<LoginScreen> {
     required TextEditingController controller,
     required String hint,
     required IconData icon,
-    TextInputType type = TextInputType.text,
+    TextInputType type =
+        TextInputType.text,
   }) {
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFF0C1F3F),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius:
+            BorderRadius.circular(14),
       ),
       child: TextField(
         controller: controller,
         keyboardType: type,
-        style: const TextStyle(color: Colors.white, fontSize: 15),
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 15,
+        ),
         decoration: InputDecoration(
           hintText: hint,
-          hintStyle: const TextStyle(color: Color(0xFF8FAADC), fontSize: 15),
-          prefixIcon: Icon(icon, color: const Color(0xFF8FAADC), size: 20),
+          hintStyle: const TextStyle(
+            color: Color(0xFF8FAADC),
+            fontSize: 15,
+          ),
+          prefixIcon: Icon(
+            icon,
+            color: const Color(0xFF8FAADC),
+            size: 20,
+          ),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(
+          contentPadding:
+              const EdgeInsets.symmetric(
             horizontal: 16,
             vertical: 18,
           ),
@@ -361,3 +529,4 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
+
