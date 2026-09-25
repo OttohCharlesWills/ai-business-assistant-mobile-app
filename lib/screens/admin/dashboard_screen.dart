@@ -148,7 +148,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                             Text(
                               formatMoney(
-                                data!['totalRevenueToday'],
+                                data!['grossSalesToday'],
                               ),
                               style: const TextStyle(
                                 color: Colors.white,
@@ -218,7 +218,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             _row(
                               "Revenue",
                               formatMoney(
-                                data!['totalRevenueToday'],
+                                data!['grossSalesToday'],
                               ),
                               null,
                             ),

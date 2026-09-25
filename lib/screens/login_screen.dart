@@ -269,21 +269,20 @@ class _LoginScreenState extends State<LoginScreen> {
                               BorderRadius.circular(16),
                         ),
 
-                        child: Image.asset(
-                          'assets/icon/icon.png',
-                          width: 60,
-                          height: 60,
-                          fit: BoxFit.contain,
-
-                          errorBuilder:
-                              (_, __, ___) =>
-                                  const Icon(
-                            Icons.smart_toy_rounded,
-                            size: 60,
-                            color: Colors.white,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.asset(
+                            'assets/icon/icon.png',
+                            width: 60,
+                            height: 60,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const Icon(
+                              Icons.smart_toy_rounded,
+                              size: 60,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
-                      ),
 
                     const SizedBox(height: 18),
 

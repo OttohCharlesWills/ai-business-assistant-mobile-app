@@ -92,10 +92,19 @@ class FullScreenLoader extends StatelessWidget {
                       color: const Color(0xFF2F5DA8),
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: const Icon(
-                      Icons.smart_toy_rounded,
-                      color: Colors.white,
-                      size: 28,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.asset(
+                        'assets/icon/icon.png',
+                        width: 60,
+                        height: 60,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const Icon(
+                          Icons.smart_toy_rounded,
+                          size: 60,
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
                   ),
                 ],

@@ -34,6 +34,8 @@ import '../screens/admin/setting/setting_screen.dart';
 
 import '../screens/login_screen.dart';
 
+import '../screens/admin/plan/plan_screen.dart';
+
 class SideNav extends StatefulWidget {
   const SideNav({super.key});
 
@@ -46,6 +48,7 @@ class _SideNavState extends State<SideNav> {
   bool _invoiceExpanded = false;
   bool _reportsExpanded = false;
   bool _productionExpanded = false;
+  bool _settingsExpanded = false;
 
   @override
   void initState() {
@@ -143,15 +146,18 @@ class _SideNavState extends State<SideNav> {
                       color: const Color(0xFF2F5DA8),
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    child: Image.asset(
-                      'assets/icon/icon.png',
-                      width: 60,
-                      height: 60,
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => const Icon(
-                        Icons.smart_toy_rounded,
-                        size: 60,
-                        color: Colors.white,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.asset(
+                        'assets/icon/icon.png',
+                        width: 60,
+                        height: 60,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const Icon(
+                          Icons.smart_toy_rounded,
+                          size: 60,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),
@@ -587,10 +593,39 @@ class _SideNavState extends State<SideNav> {
                   // SETTINGS
                   // ─────────────────────────────────────────────────────────
 
-                  _NavItem(
+                  _ExpandableNavItem(
                     icon: Icons.settings_rounded,
                     label: "Settings",
-                    onTap: _openSettings,
+                    isExpanded: _settingsExpanded,
+                    onTap: () {
+                      setState(() {
+                        _settingsExpanded = !_settingsExpanded;
+                      });
+                    },
+                    children: [
+                      // MY SUBSCRIPTION PLAN
+                      _SubNavItem(
+                        icon: Icons.workspace_premium_rounded,
+                        label: "My Subscription Plan",
+                        onTap: () {
+                          Navigator.pop(context);
+
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const PlanScreen(),
+                            ),
+                          );
+                        },
+                      ),
+
+                      // SETTINGS
+                      _SubNavItem(
+                        icon: Icons.settings_outlined,
+                        label: "Settings",
+                        onTap: _openSettings,
+                      ),
+                    ],
                   ),
 
                   // PROFILE

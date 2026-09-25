@@ -34,6 +34,10 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
   final TextEditingController _sellingPriceController =
       TextEditingController();
 
+  // Search controller for the product selector.
+  final TextEditingController _productSearchController =
+      TextEditingController();
+
   List<dynamic> _shops = [];
   List<dynamic> _sourceProducts = [];
 
@@ -68,6 +72,8 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
     _quantityController.dispose();
     _costPriceController.dispose();
     _sellingPriceController.dispose();
+    _productSearchController.dispose();
+
     super.dispose();
   }
 
@@ -152,12 +158,19 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
   Future<void> _loadProductsForShop(int shopId) async {
     if (!_hasAccess) return;
 
+    // Clear previous product search when switching shops.
+    _productSearchController.clear();
+
     setState(() {
       _loadingProducts = true;
       _sourceProducts = [];
       _productId = null;
       _selectedProduct = null;
       _errorMessage = null;
+
+      _quantityController.clear();
+      _costPriceController.clear();
+      _sellingPriceController.clear();
     });
 
     try {
@@ -194,14 +207,21 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
       setState(() {
         _productId = null;
         _selectedProduct = null;
+        _costPriceController.clear();
+        _sellingPriceController.clear();
       });
+
       return;
     }
 
     dynamic product;
 
     for (final item in _sourceProducts) {
-      if (item['id'] == productId) {
+      final itemId = int.tryParse(
+        item['id']?.toString() ?? '',
+      );
+
+      if (itemId == productId) {
         product = item;
         break;
       }
@@ -219,6 +239,470 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
             (product['price'] ?? '').toString();
       }
     });
+  }
+
+  // ---------------------------------------------------------------------------
+  // OPEN SEARCHABLE PRODUCT SELECTOR
+  // ---------------------------------------------------------------------------
+
+  void _openProductSelector() {
+    if (!_hasAccess ||
+        _sourceShopId == null ||
+        _sourceProducts.isEmpty) {
+      return;
+    }
+
+    _productSearchController.clear();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: _cardColor,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(24),
+        ),
+      ),
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            final query =
+                _productSearchController.text.trim().toLowerCase();
+
+            final filteredProducts =
+                _sourceProducts.where((product) {
+              if (query.isEmpty) {
+                return true;
+              }
+
+              final name =
+                  _getProductName(product).toLowerCase();
+
+              final barcode =
+                  product['barcode']
+                          ?.toString()
+                          .toLowerCase() ??
+                      '';
+
+              return name.contains(query) ||
+                  barcode.contains(query);
+            }).toList();
+
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: 20,
+                  right: 20,
+                  top: 16,
+                  bottom:
+                      MediaQuery.of(sheetContext).viewInsets.bottom +
+                          16,
+                ),
+                child: SizedBox(
+                  height:
+                      MediaQuery.of(sheetContext).size.height * 0.75,
+                  child: Column(
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
+                    children: [
+                      // -------------------------------------------------------
+                      // SHEET HANDLE
+                      // -------------------------------------------------------
+
+                      Center(
+                        child: Container(
+                          width: 42,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color:
+                                _secondaryText.withOpacity(0.35),
+                            borderRadius:
+                                BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 18),
+
+                      // -------------------------------------------------------
+                      // TITLE
+                      // -------------------------------------------------------
+
+                      Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'Select Product',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 19,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            '${filteredProducts.length} products',
+                            style: const TextStyle(
+                              color: _secondaryText,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 14),
+
+                      // -------------------------------------------------------
+                      // SEARCH BAR
+                      // -------------------------------------------------------
+
+                      Container(
+                        decoration: BoxDecoration(
+                          color: _inputColor,
+                          borderRadius:
+                              BorderRadius.circular(12),
+                          border: Border.all(
+                            color:
+                                _primaryColor.withOpacity(0.20),
+                          ),
+                        ),
+                        child: TextField(
+                          controller:
+                              _productSearchController,
+                          autofocus: true,
+                          onChanged: (_) {
+                            setSheetState(() {});
+                          },
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                          ),
+                          cursorColor: _primaryColor,
+                          decoration: InputDecoration(
+                            hintText:
+                                'Search product or barcode...',
+                            hintStyle:
+                                const TextStyle(
+                              color: Color(0xFF6F88AD),
+                              fontSize: 14,
+                            ),
+                            prefixIcon:
+                                const Icon(
+                              Icons.search_rounded,
+                              color: _secondaryText,
+                            ),
+                            suffixIcon:
+                                _productSearchController
+                                        .text
+                                        .isNotEmpty
+                                    ? IconButton(
+                                        onPressed: () {
+                                          _productSearchController
+                                              .clear();
+
+                                          setSheetState(() {});
+                                        },
+                                        icon:
+                                            const Icon(
+                                          Icons.close_rounded,
+                                          color:
+                                              _secondaryText,
+                                        ),
+                                      )
+                                    : null,
+                            border: InputBorder.none,
+                            contentPadding:
+                                const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 14,
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 14),
+
+                      // -------------------------------------------------------
+                      // PRODUCT LIST
+                      // -------------------------------------------------------
+
+                      Expanded(
+                        child: filteredProducts.isEmpty
+                            ? _buildNoProductsFound()
+                            : ListView.separated(
+                                keyboardDismissBehavior:
+                                    ScrollViewKeyboardDismissBehavior
+                                        .onDrag,
+                                itemCount:
+                                    filteredProducts.length,
+                                separatorBuilder:
+                                    (_, __) =>
+                                        const SizedBox(
+                                  height: 8,
+                                ),
+                                itemBuilder:
+                                    (context, index) {
+                                  final product =
+                                      filteredProducts[index];
+
+                                  final productId =
+                                      int.tryParse(
+                                    product['id']
+                                            ?.toString() ??
+                                        '',
+                                  );
+
+                                  final stock =
+                                      _getStockQuantity(product);
+
+                                  final barcode =
+                                      product['barcode']
+                                          ?.toString();
+
+                                  final isSelected =
+                                      productId == _productId;
+
+                                  return InkWell(
+                                    borderRadius:
+                                        BorderRadius.circular(
+                                      12,
+                                    ),
+                                    onTap: () {
+                                      if (productId == null) {
+                                        return;
+                                      }
+
+                                      Navigator.pop(
+                                        sheetContext,
+                                      );
+
+                                      _selectProduct(
+                                        productId,
+                                      );
+                                    },
+                                    child: Container(
+                                      padding:
+                                          const EdgeInsets.all(
+                                        14,
+                                      ),
+                                      decoration:
+                                          BoxDecoration(
+                                        color: isSelected
+                                            ? _primaryColor
+                                                .withOpacity(0.16)
+                                            : _inputColor,
+                                        borderRadius:
+                                            BorderRadius.circular(
+                                          12,
+                                        ),
+                                        border: Border.all(
+                                          color: isSelected
+                                              ? _primaryColor
+                                              : _primaryColor
+                                                  .withOpacity(
+                                                  0.12,
+                                                ),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            width: 42,
+                                            height: 42,
+                                            decoration:
+                                                BoxDecoration(
+                                              color: _primaryColor
+                                                  .withOpacity(
+                                                0.14,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius
+                                                      .circular(
+                                                10,
+                                              ),
+                                            ),
+                                            child:
+                                                const Icon(
+                                              Icons
+                                                  .inventory_2_outlined,
+                                              color:
+                                                  _secondaryText,
+                                              size: 21,
+                                            ),
+                                          ),
+
+                                          const SizedBox(
+                                            width: 12,
+                                          ),
+
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment
+                                                      .start,
+                                              children: [
+                                                Text(
+                                                  _getProductName(
+                                                    product,
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow
+                                                          .ellipsis,
+                                                  style:
+                                                      const TextStyle(
+                                                    color:
+                                                        Colors.white,
+                                                    fontSize: 14,
+                                                    fontWeight:
+                                                        FontWeight
+                                                            .w600,
+                                                  ),
+                                                ),
+
+                                                const SizedBox(
+                                                  height: 5,
+                                                ),
+
+                                                Row(
+                                                  children: [
+                                                    Text(
+                                                      'Stock: $stock',
+                                                      style:
+                                                          const TextStyle(
+                                                        color:
+                                                            _secondaryText,
+                                                        fontSize:
+                                                            12,
+                                                      ),
+                                                    ),
+
+                                                    if (barcode !=
+                                                            null &&
+                                                        barcode
+                                                            .isNotEmpty) ...[
+                                                      const SizedBox(
+                                                        width: 10,
+                                                      ),
+
+                                                      const Text(
+                                                        '•',
+                                                        style:
+                                                            TextStyle(
+                                                          color:
+                                                              _secondaryText,
+                                                        ),
+                                                      ),
+
+                                                      const SizedBox(
+                                                        width: 10,
+                                                      ),
+
+                                                      Expanded(
+                                                        child:
+                                                            Text(
+                                                          barcode,
+                                                          maxLines:
+                                                              1,
+                                                          overflow:
+                                                              TextOverflow
+                                                                  .ellipsis,
+                                                          style:
+                                                              const TextStyle(
+                                                            color:
+                                                                _secondaryText,
+                                                            fontSize:
+                                                                11,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+
+                                          const SizedBox(
+                                            width: 8,
+                                          ),
+
+                                          Icon(
+                                            isSelected
+                                                ? Icons
+                                                    .check_circle_rounded
+                                                : Icons
+                                                    .chevron_right_rounded,
+                                            color: isSelected
+                                                ? _primaryColor
+                                                : _secondaryText,
+                                            size: 21,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // NO PRODUCTS FOUND
+  // ---------------------------------------------------------------------------
+
+  Widget _buildNoProductsFound() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: _primaryColor.withOpacity(0.12),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.inventory_2_outlined,
+              color: _secondaryText,
+              size: 30,
+            ),
+          ),
+
+          const SizedBox(height: 14),
+
+          const Text(
+            'No products found',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+
+          const SizedBox(height: 6),
+
+          const Text(
+            'Try a different product name or barcode.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: _secondaryText,
+              fontSize: 13,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -345,6 +829,7 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
       _quantityController.clear();
       _costPriceController.clear();
       _sellingPriceController.clear();
+      _productSearchController.clear();
     });
   }
 
@@ -374,7 +859,13 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
 
     final value = product['stock_quantity'];
 
-    if (value is int) return value;
+    if (value is int) {
+      return value;
+    }
+
+    if (value is double) {
+      return value.toInt();
+    }
 
     return int.tryParse(value.toString()) ?? 0;
   }
@@ -388,7 +879,8 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
   }
 
   String _getProductName(dynamic product) {
-    return (product['name'] ?? 'Product ${product['id']}')
+    return (product['name'] ??
+            'Product ${product['id']}')
         .toString();
   }
 
@@ -470,7 +962,6 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
           : Stack(
               children: [
                 _buildPageContent(),
-
                 if (!_hasAccess) _buildLockedOverlay(),
               ],
             ),
@@ -548,15 +1039,19 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
                     padding: const EdgeInsets.all(28),
                     decoration: BoxDecoration(
                       color: _cardColor,
-                      borderRadius: BorderRadius.circular(22),
+                      borderRadius:
+                          BorderRadius.circular(22),
                       border: Border.all(
-                        color: _primaryColor.withOpacity(0.35),
+                        color:
+                            _primaryColor.withOpacity(0.35),
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.35),
+                          color:
+                              Colors.black.withOpacity(0.35),
                           blurRadius: 30,
-                          offset: const Offset(0, 15),
+                          offset:
+                              const Offset(0, 15),
                         ),
                       ],
                     ),
@@ -567,12 +1062,14 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
                           width: 68,
                           height: 68,
                           decoration: BoxDecoration(
-                            color: _primaryColor.withOpacity(0.16),
+                            color: _primaryColor
+                                .withOpacity(0.16),
                             shape: BoxShape.circle,
                           ),
                           child: const Icon(
                             Icons.lock_rounded,
-                            color: Color(0xFF8FAADC),
+                            color:
+                                Color(0xFF8FAADC),
                             size: 32,
                           ),
                         ),
@@ -585,7 +1082,8 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 21,
-                            fontWeight: FontWeight.w800,
+                            fontWeight:
+                                FontWeight.w800,
                           ),
                         ),
 
@@ -607,14 +1105,21 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
                           width: double.infinity,
                           height: 50,
                           child: ElevatedButton(
-                            onPressed: _openSubscriptionScreen,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _primaryColor,
-                              foregroundColor: Colors.white,
+                            onPressed:
+                                _openSubscriptionScreen,
+                            style:
+                                ElevatedButton.styleFrom(
+                              backgroundColor:
+                                  _primaryColor,
+                              foregroundColor:
+                                  Colors.white,
                               elevation: 0,
-                              shape: RoundedRectangleBorder(
+                              shape:
+                                  RoundedRectangleBorder(
                                 borderRadius:
-                                    BorderRadius.circular(12),
+                                    BorderRadius.circular(
+                                  12,
+                                ),
                               ),
                             ),
                             child: const Row(
@@ -622,7 +1127,8 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
                                   MainAxisAlignment.center,
                               children: [
                                 Icon(
-                                  Icons.workspace_premium_rounded,
+                                  Icons
+                                      .workspace_premium_rounded,
                                   size: 20,
                                 ),
                                 SizedBox(width: 8),
@@ -630,7 +1136,8 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
                                   'Upgrade Plan',
                                   style: TextStyle(
                                     fontSize: 15,
-                                    fontWeight: FontWeight.w700,
+                                    fontWeight:
+                                        FontWeight.w700,
                                   ),
                                 ),
                               ],
@@ -655,7 +1162,8 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
 
   Widget _buildHeader() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment:
+          CrossAxisAlignment.start,
       children: [
         const Text(
           'Move stock between shops',
@@ -694,7 +1202,8 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
         ),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
         children: [
           _buildSectionTitle(
             icon: Icons.swap_horiz_rounded,
@@ -739,16 +1248,21 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
           _buildTextField(
             controller: _quantityController,
             hint: 'Enter quantity',
-            keyboardType: TextInputType.number,
-            prefixIcon: Icons.inventory_2_outlined,
+            keyboardType:
+                TextInputType.number,
+            prefixIcon:
+                Icons.inventory_2_outlined,
             validator: (value) {
-              if (value == null || value.trim().isEmpty) {
+              if (value == null ||
+                  value.trim().isEmpty) {
                 return 'Quantity is required';
               }
 
-              final quantity = int.tryParse(value.trim());
+              final quantity =
+                  int.tryParse(value.trim());
 
-              if (quantity == null || quantity < 1) {
+              if (quantity == null ||
+                  quantity < 1) {
                 return 'Enter a valid quantity';
               }
 
@@ -763,21 +1277,26 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
           const SizedBox(height: 8),
 
           _buildTextField(
-            controller: _costPriceController,
+            controller:
+                _costPriceController,
             hint: 'Enter cost price',
             keyboardType:
                 const TextInputType.numberWithOptions(
               decimal: true,
             ),
-            prefixIcon: Icons.money_outlined,
+            prefixIcon:
+                Icons.money_outlined,
             validator: (value) {
-              if (value == null || value.trim().isEmpty) {
+              if (value == null ||
+                  value.trim().isEmpty) {
                 return 'Cost price is required';
               }
 
-              final price = double.tryParse(value.trim());
+              final price =
+                  double.tryParse(value.trim());
 
-              if (price == null || price < 0) {
+              if (price == null ||
+                  price < 0) {
                 return 'Enter a valid cost price';
               }
 
@@ -792,21 +1311,26 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
           const SizedBox(height: 8),
 
           _buildTextField(
-            controller: _sellingPriceController,
+            controller:
+                _sellingPriceController,
             hint: 'Enter selling price',
             keyboardType:
                 const TextInputType.numberWithOptions(
               decimal: true,
             ),
-            prefixIcon: Icons.sell_outlined,
+            prefixIcon:
+                Icons.sell_outlined,
             validator: (value) {
-              if (value == null || value.trim().isEmpty) {
+              if (value == null ||
+                  value.trim().isEmpty) {
                 return 'Selling price is required';
               }
 
-              final price = double.tryParse(value.trim());
+              final price =
+                  double.tryParse(value.trim());
 
-              if (price == null || price < 0) {
+              if (price == null ||
+                  price < 0) {
                 return 'Enter a valid selling price';
               }
 
@@ -837,23 +1361,31 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
       ),
       decoration: _inputDecoration(
         hint: 'Select source shop',
-        prefixIcon: Icons.store_outlined,
+        prefixIcon:
+            Icons.store_outlined,
       ),
-      items: _shops.map<DropdownMenuItem<int>>((shop) {
-        final id = int.tryParse(
-          shop['id'].toString(),
-        );
+      items:
+          _shops.map<DropdownMenuItem<int>>(
+        (shop) {
+          final id = int.tryParse(
+            shop['id'].toString(),
+          );
 
-        return DropdownMenuItem<int>(
-          value: id,
-          child: Text(
-            _getShopName(shop),
-            overflow: TextOverflow.ellipsis,
-          ),
-        );
-      }).toList(),
+          return DropdownMenuItem<int>(
+            value: id,
+            child: Text(
+              _getShopName(shop),
+              overflow:
+                  TextOverflow.ellipsis,
+            ),
+          );
+        },
+      ).toList(),
       onChanged: (value) {
-        if (value == null || !_hasAccess) return;
+        if (value == null ||
+            !_hasAccess) {
+          return;
+        }
 
         setState(() {
           _sourceShopId = value;
@@ -873,29 +1405,33 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
   }
 
   // ---------------------------------------------------------------------------
-  // PRODUCT DROPDOWN
+  // SEARCHABLE PRODUCT SELECTOR
   // ---------------------------------------------------------------------------
 
   Widget _buildProductDropdown() {
     if (_loadingProducts) {
       return Container(
         height: 56,
-        padding: const EdgeInsets.symmetric(
+        padding:
+            const EdgeInsets.symmetric(
           horizontal: 16,
         ),
         decoration: BoxDecoration(
           color: _inputColor,
           border: Border.all(
-            color: _primaryColor.withOpacity(0.25),
+            color:
+                _primaryColor.withOpacity(0.25),
           ),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius:
+              BorderRadius.circular(12),
         ),
         child: const Row(
           children: [
             SizedBox(
               width: 20,
               height: 20,
-              child: CircularProgressIndicator(
+              child:
+                  CircularProgressIndicator(
                 strokeWidth: 2,
                 color: _primaryColor,
               ),
@@ -912,49 +1448,108 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
       );
     }
 
-    return DropdownButtonFormField<int>(
-      value: _productId,
-      isExpanded: true,
-      dropdownColor: _cardColor,
-      style: const TextStyle(
-        color: Colors.white,
-        fontSize: 14,
-      ),
-      decoration: _inputDecoration(
-        hint: _sourceShopId == null
-            ? 'Select a source shop first'
-            : _sourceProducts.isEmpty
-                ? 'No products found'
-                : 'Select product',
-        prefixIcon: Icons.inventory_2_outlined,
-      ),
-      items: _sourceProducts.map<DropdownMenuItem<int>>(
-        (product) {
-          final id = int.tryParse(
-            product['id'].toString(),
-          );
+    final bool disabled =
+        _sourceShopId == null ||
+        _sourceProducts.isEmpty ||
+        !_hasAccess;
 
-          return DropdownMenuItem<int>(
-            value: id,
-            child: Text(
-              _getProductName(product),
-              overflow: TextOverflow.ellipsis,
-            ),
-          );
-        },
-      ).toList(),
-      onChanged: _sourceShopId == null ||
-              _sourceProducts.isEmpty ||
-              !_hasAccess
+    return GestureDetector(
+      onTap: disabled
           ? null
-          : _selectProduct,
-      validator: (value) {
-        if (value == null) {
-          return 'Please select a product';
-        }
+          : _openProductSelector,
+      child: Container(
+        width: double.infinity,
+        constraints:
+            const BoxConstraints(
+          minHeight: 56,
+        ),
+        padding:
+            const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 10,
+        ),
+        decoration: BoxDecoration(
+          color: _inputColor,
+          border: Border.all(
+            color:
+                _primaryColor.withOpacity(0.20),
+          ),
+          borderRadius:
+              BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.inventory_2_outlined,
+              color: _secondaryText,
+              size: 21,
+            ),
 
-        return null;
-      },
+            const SizedBox(width: 12),
+
+            Expanded(
+              child: _selectedProduct == null
+                  ? Text(
+                      _sourceShopId == null
+                          ? 'Select a source shop first'
+                          : _sourceProducts.isEmpty
+                              ? 'No products found'
+                              : 'Select product',
+                      style:
+                          const TextStyle(
+                        color:
+                            Color(0xFF6F88AD),
+                        fontSize: 14,
+                      ),
+                    )
+                  : Column(
+                      crossAxisAlignment:
+                          CrossAxisAlignment.start,
+                      mainAxisSize:
+                          MainAxisSize.min,
+                      children: [
+                        Text(
+                          _getProductName(
+                            _selectedProduct,
+                          ),
+                          maxLines: 1,
+                          overflow:
+                              TextOverflow.ellipsis,
+                          style:
+                              const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight:
+                                FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(
+                            height: 3),
+                        Text(
+                          'Stock: ${_getStockQuantity(_selectedProduct)}',
+                          style:
+                              const TextStyle(
+                            color:
+                                _secondaryText,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+
+            const SizedBox(width: 8),
+
+            Icon(
+              Icons
+                  .keyboard_arrow_down_rounded,
+              color: disabled
+                  ? const Color(0xFF6F88AD)
+                  : _secondaryText,
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -963,7 +1558,8 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
   // ---------------------------------------------------------------------------
 
   Widget _buildDestinationDropdown() {
-    final availableShops = _shops.where((shop) {
+    final availableShops =
+        _shops.where((shop) {
       final id = int.tryParse(
         shop['id'].toString(),
       );
@@ -983,10 +1579,12 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
         hint: _sourceShopId == null
             ? 'Select source shop first'
             : 'Select destination shop',
-        prefixIcon:
-            Icons.store_mall_directory_outlined,
+        prefixIcon: Icons
+            .store_mall_directory_outlined,
       ),
-      items: availableShops.map<DropdownMenuItem<int>>(
+      items:
+          availableShops.map<
+              DropdownMenuItem<int>>(
         (shop) {
           final id = int.tryParse(
             shop['id'].toString(),
@@ -996,18 +1594,22 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
             value: id,
             child: Text(
               _getShopName(shop),
-              overflow: TextOverflow.ellipsis,
+              overflow:
+                  TextOverflow.ellipsis,
             ),
           );
         },
       ).toList(),
-      onChanged: _sourceShopId == null || !_hasAccess
-          ? null
-          : (value) {
-              setState(() {
-                _destinationShopId = value;
-              });
-            },
+      onChanged:
+          _sourceShopId == null ||
+                  !_hasAccess
+              ? null
+              : (value) {
+                  setState(() {
+                    _destinationShopId =
+                        value;
+                  });
+                },
       validator: (value) {
         if (value == null) {
           return 'Please select a destination shop';
@@ -1023,19 +1625,24 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
   // ---------------------------------------------------------------------------
 
   Widget _buildStockInfo() {
-    final stock = _getStockQuantity(_selectedProduct);
+    final stock =
+        _getStockQuantity(_selectedProduct);
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(
+      padding:
+          const EdgeInsets.symmetric(
         horizontal: 14,
         vertical: 12,
       ),
       decoration: BoxDecoration(
-        color: _primaryColor.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(10),
+        color:
+            _primaryColor.withOpacity(0.12),
+        borderRadius:
+            BorderRadius.circular(10),
         border: Border.all(
-          color: _primaryColor.withOpacity(0.15),
+          color:
+              _primaryColor.withOpacity(0.15),
         ),
       ),
       child: Row(
@@ -1045,20 +1652,27 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
             size: 20,
             color: Color(0xFF8FAADC),
           ),
+
           const SizedBox(width: 10),
+
           const Text(
             'Available stock:',
             style: TextStyle(
               color: Colors.white,
-              fontWeight: FontWeight.w500,
+              fontWeight:
+                  FontWeight.w500,
             ),
           ),
+
           const Spacer(),
+
           Text(
             stock.toString(),
             style: const TextStyle(
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF8FAADC),
+              fontWeight:
+                  FontWeight.w800,
+              color:
+                  Color(0xFF8FAADC),
             ),
           ),
         ],
@@ -1078,36 +1692,48 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
         onPressed: _transferring
             ? null
             : _transferStock,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: _primaryColor,
-          foregroundColor: Colors.white,
+        style:
+            ElevatedButton.styleFrom(
+          backgroundColor:
+              _primaryColor,
+          foregroundColor:
+              Colors.white,
           disabledBackgroundColor:
-              _primaryColor.withOpacity(.55),
+              _primaryColor
+                  .withOpacity(.55),
           elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+          shape:
+              RoundedRectangleBorder(
+            borderRadius:
+                BorderRadius.circular(12),
           ),
         ),
         child: _transferring
             ? const SizedBox(
                 width: 23,
                 height: 23,
-                child: CircularProgressIndicator(
+                child:
+                    CircularProgressIndicator(
                   strokeWidth: 2.5,
                   color: Colors.white,
                 ),
               )
             : const Row(
                 mainAxisAlignment:
-                    MainAxisAlignment.center,
+                    MainAxisAlignment
+                        .center,
                 children: [
-                  Icon(Icons.swap_horiz_rounded),
+                  Icon(
+                    Icons
+                        .swap_horiz_rounded,
+                  ),
                   SizedBox(width: 8),
                   Text(
                     'Transfer Stock',
                     style: TextStyle(
                       fontSize: 15,
-                      fontWeight: FontWeight.w700,
+                      fontWeight:
+                          FontWeight.w700,
                     ),
                   ),
                 ],
@@ -1123,12 +1749,16 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
   Widget _buildErrorBox() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
+      padding:
+          const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.redAccent.withOpacity(.08),
-        borderRadius: BorderRadius.circular(12),
+        color:
+            Colors.redAccent.withOpacity(.08),
+        borderRadius:
+            BorderRadius.circular(12),
         border: Border.all(
-          color: Colors.redAccent.withOpacity(.20),
+          color:
+              Colors.redAccent.withOpacity(.20),
         ),
       ),
       child: Row(
@@ -1139,12 +1769,15 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
             Icons.error_outline,
             color: Colors.redAccent,
           ),
+
           const SizedBox(width: 10),
+
           Expanded(
             child: Text(
               _errorMessage!,
               style: const TextStyle(
-                color: Colors.redAccent,
+                color:
+                    Colors.redAccent,
                 height: 1.4,
               ),
             ),
@@ -1167,21 +1800,28 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
         Container(
           width: 40,
           height: 40,
-          decoration: BoxDecoration(
-            color: _primaryColor.withOpacity(.16),
-            borderRadius: BorderRadius.circular(10),
+          decoration:
+              BoxDecoration(
+            color:
+                _primaryColor.withOpacity(.16),
+            borderRadius:
+                BorderRadius.circular(10),
           ),
           child: Icon(
             icon,
-            color: const Color(0xFF8FAADC),
+            color:
+                const Color(0xFF8FAADC),
           ),
         ),
+
         const SizedBox(width: 12),
+
         Text(
           title,
           style: const TextStyle(
             fontSize: 17,
-            fontWeight: FontWeight.w800,
+            fontWeight:
+                FontWeight.w800,
             color: Colors.white,
           ),
         ),
@@ -1198,8 +1838,10 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
       text,
       style: const TextStyle(
         fontSize: 13,
-        fontWeight: FontWeight.w700,
-        color: Color(0xFFB7C8E5),
+        fontWeight:
+            FontWeight.w700,
+        color:
+            Color(0xFFB7C8E5),
       ),
     );
   }
@@ -1209,11 +1851,14 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
   // ---------------------------------------------------------------------------
 
   Widget _buildTextField({
-    required TextEditingController controller,
+    required TextEditingController
+        controller,
     required String hint,
-    required TextInputType keyboardType,
+    required TextInputType
+        keyboardType,
     required IconData prefixIcon,
-    String? Function(String?)? validator,
+    String? Function(String?)?
+        validator,
   }) {
     return TextFormField(
       controller: controller,
@@ -1222,10 +1867,13 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
       style: const TextStyle(
         color: Colors.white,
       ),
-      cursorColor: _primaryColor,
-      decoration: _inputDecoration(
+      cursorColor:
+          _primaryColor,
+      decoration:
+          _inputDecoration(
         hint: hint,
-        prefixIcon: prefixIcon,
+        prefixIcon:
+            prefixIcon,
       ),
     );
   }
@@ -1240,55 +1888,93 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
   }) {
     return InputDecoration(
       hintText: hint,
-      hintStyle: const TextStyle(
-        color: Color(0xFF6F88AD),
+      hintStyle:
+          const TextStyle(
+        color:
+            Color(0xFF6F88AD),
         fontSize: 14,
       ),
       prefixIcon: Icon(
         prefixIcon,
-        color: const Color(0xFF8FAADC),
+        color:
+            const Color(0xFF8FAADC),
         size: 21,
       ),
       filled: true,
-      fillColor: _inputColor,
-      contentPadding: const EdgeInsets.symmetric(
+      fillColor:
+          _inputColor,
+      contentPadding:
+          const EdgeInsets
+              .symmetric(
         horizontal: 14,
         vertical: 16,
       ),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(
-          color: _primaryColor.withOpacity(0.20),
+      border:
+          OutlineInputBorder(
+        borderRadius:
+            BorderRadius.circular(
+          12,
+        ),
+        borderSide:
+            BorderSide(
+          color: _primaryColor
+              .withOpacity(0.20),
         ),
       ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(
-          color: _primaryColor.withOpacity(0.20),
+      enabledBorder:
+          OutlineInputBorder(
+        borderRadius:
+            BorderRadius.circular(
+          12,
+        ),
+        borderSide:
+            BorderSide(
+          color: _primaryColor
+              .withOpacity(0.20),
         ),
       ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(
-          color: _primaryColor,
+      focusedBorder:
+          OutlineInputBorder(
+        borderRadius:
+            BorderRadius.circular(
+          12,
+        ),
+        borderSide:
+            const BorderSide(
+          color:
+              _primaryColor,
           width: 1.5,
         ),
       ),
-      errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(
-          color: Colors.redAccent,
+      errorBorder:
+          OutlineInputBorder(
+        borderRadius:
+            BorderRadius.circular(
+          12,
+        ),
+        borderSide:
+            const BorderSide(
+          color:
+              Colors.redAccent,
         ),
       ),
-      focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(
-          color: Colors.redAccent,
+      focusedErrorBorder:
+          OutlineInputBorder(
+        borderRadius:
+            BorderRadius.circular(
+          12,
+        ),
+        borderSide:
+            const BorderSide(
+          color:
+              Colors.redAccent,
           width: 1.5,
         ),
       ),
-      errorStyle: const TextStyle(
-        color: Colors.redAccent,
+      errorStyle:
+          const TextStyle(
+        color:
+            Colors.redAccent,
       ),
     );
   }
