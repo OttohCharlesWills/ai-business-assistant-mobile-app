@@ -302,7 +302,11 @@ class _ProductionTypeScreenState extends State<ProductionTypeScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => const SubscriptionScreen(),
+        builder: (_) => SubscriptionScreen(
+          onActivated: () {
+            Navigator.pop(context);
+          },
+        ),
       ),
     );
   }

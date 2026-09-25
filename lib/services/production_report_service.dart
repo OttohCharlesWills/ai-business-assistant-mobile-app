@@ -1,4 +1,3 @@
-
 import 'dart:convert';
 
 import 'api_client.dart' as http;
@@ -7,10 +6,6 @@ import 'plan_access_service.dart';
 
 class ProductionReportService {
   static String get baseUrl => AuthService.baseUrl;
-
-  // ------------------------------------------------------------
-  // AUTH HEADERS
-  // ------------------------------------------------------------
 
   static Future<Map<String, String>> _headers() async {
     final token = await AuthService.getToken();
@@ -25,10 +20,6 @@ class ProductionReportService {
       "Authorization": "Bearer $token",
     };
   }
-
-  // ------------------------------------------------------------
-  // PRODUCTION ACCESS CHECK
-  // ------------------------------------------------------------
 
   static Future<void> _checkProductionAccess() async {
     final allowed = await PlanAccessService.hasFeature(
@@ -49,11 +40,7 @@ class ProductionReportService {
     }
   }
 
-  // ------------------------------------------------------------
-  // GET PRODUCTION REPORT
   // GET /admin/reports/production
-  // ------------------------------------------------------------
-
   static Future<Map<String, dynamic>> getProductionReport({
     String? startDate,
     String? endDate,
@@ -61,7 +48,6 @@ class ProductionReportService {
     String? search,
   }) async {
     try {
-      // Business plan restriction
       await _checkProductionAccess();
 
       final params = <String, String>{};
@@ -104,18 +90,13 @@ class ProductionReportService {
     }
   }
 
-  // ------------------------------------------------------------
-  // DOWNLOAD PRODUCTION REPORT PDF
   // GET /admin/reports/production/pdf
-  // ------------------------------------------------------------
-
   static Future<List<int>?> downloadProductionReportPdf({
     String? startDate,
     String? endDate,
     dynamic shopId,
   }) async {
     try {
-      // Business plan restriction
       await _checkProductionAccess();
 
       final params = <String, String>{};
@@ -141,9 +122,7 @@ class ProductionReportService {
       final token = await AuthService.getToken();
 
       if (token == null || token.isEmpty) {
-        throw Exception(
-          'Authentication token not found.',
-        );
+        throw Exception('Authentication token not found.');
       }
 
       final res = await http.get(
@@ -164,32 +143,4 @@ class ProductionReportService {
     }
   }
 }
-```
 
-### What changed
-
-The important addition is:
-
-```dart
-import 'plan_access_service.dart';
-```
-
-and:
-
-```dart
-static Future<void> _checkProductionAccess() async {
-  final allowed = await PlanAccessService.hasFeature('production');
-
-  if (!allowed) {
-    final message = await PlanAccessService.getFeatureMessage(
-      'production',
-      featureName: 'Production & Manufacturing',
-    );
-
-    throw Exception(
-      message.isNotEmpty
-          ? message
-          : 'Please upgrade to the Business plan to access Production & Manufacturing.',
-    );
-  }
-}

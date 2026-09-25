@@ -12,7 +12,6 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-
   Map<String, dynamic>? data;
   bool loading = true;
 
@@ -31,8 +30,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> fetchDashboard() async {
-    setState(() => loading = true);
+    if (mounted) {
+      setState(() => loading = true);
+    }
+
     final result = await DashboardService.getDashboard();
+
+    if (!mounted) return;
+
     setState(() {
       data = result;
       loading = false;
@@ -40,11 +45,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   String formatMoney(dynamic value) {
-    final number = double.tryParse(value.toString()) ?? 0;
+    final number = double.tryParse(value?.toString() ?? '') ?? 0;
+
     return "₦${number.toStringAsFixed(2).replaceAllMapped(
-      RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
-      (match) => '${match[1]},',
-    )}";
+          RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
+          (match) => '${match[1]},',
+        )}";
+  }
+
+  double numericValue(dynamic value) {
+    return double.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  bool isPositive(dynamic value) {
+    return numericValue(value) >= 0;
   }
 
   @override
@@ -66,13 +80,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         leading: Builder(
           builder: (context) => IconButton(
-            icon: const Icon(Icons.menu_rounded, color: Colors.white),
-            onPressed: () => Scaffold.of(context).openDrawer(),
+            icon: const Icon(
+              Icons.menu_rounded,
+              color: Colors.white,
+            ),
+            onPressed: () {
+              Scaffold.of(context).openDrawer();
+            },
           ),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+            icon: const Icon(
+              Icons.refresh_rounded,
+              color: Colors.white,
+            ),
             onPressed: fetchDashboard,
           ),
         ],
@@ -81,12 +103,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
       drawer: const SideNav(),
 
       body: loading
-          ? const FullScreenLoader(message: "Loading dashboard...")
+          ? const FullScreenLoader(
+              message: "Loading dashboard...",
+            )
           : data == null
               ? const Center(
                   child: Text(
                     "Failed to load dashboard",
-                    style: TextStyle(color: Color(0xFF8FAADC)),
+                    style: TextStyle(
+                      color: Color(0xFF8FAADC),
+                    ),
                   ),
                 )
               : RefreshIndicator(
@@ -96,8 +122,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   child: ListView(
                     padding: const EdgeInsets.all(16),
                     children: [
+                      // =====================================================
+                      // REVENUE TODAY
+                      // =====================================================
 
-                      // REVENUE TODAY CARD
                       Container(
                         padding: const EdgeInsets.all(20),
                         width: double.infinity,
@@ -106,29 +134,43 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           borderRadius: BorderRadius.circular(18),
                         ),
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          crossAxisAlignment:
+                              CrossAxisAlignment.start,
                           children: [
                             const Text(
                               "Revenue Today",
-                              style: TextStyle(color: Color(0xFF8FAADC)),
+                              style: TextStyle(
+                                color: Color(0xFF8FAADC),
+                              ),
                             ),
+
                             const SizedBox(height: 10),
+
                             Text(
-                              formatMoney(data!['totalRevenueToday']),
+                              formatMoney(
+                                data!['totalRevenueToday'],
+                              ),
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 30,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
+
                             const SizedBox(height: 14),
+
                             Row(
                               children: [
-                                const Icon(Icons.shopping_cart_rounded,
-                                    color: Color(0xFF8FAADC), size: 16),
+                                const Icon(
+                                  Icons.shopping_cart_rounded,
+                                  color: Color(0xFF8FAADC),
+                                  size: 16,
+                                ),
+
                                 const SizedBox(width: 6),
+
                                 Text(
-                                  "Week: ${formatMoney(data!['totalSalesThisWeek'])}",
+                                  "Week: ${formatMoney(data!['totalRevenueThisWeek'] ?? data!['totalSalesThisWeek'])}",
                                   style: const TextStyle(
                                     color: Color(0xFF8FAADC),
                                     fontSize: 13,
@@ -142,14 +184,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                       const SizedBox(height: 16),
 
-                      // STAT ROW: STOCK
+                      // =====================================================
+                      // PRODUCTS IN STOCK
+                      // =====================================================
+
                       Row(
                         children: [
                           Expanded(
                             child: _statCard(
                               icon: Icons.inventory_2_rounded,
                               label: "Products in Stock",
-                              value: "${data!['productsInStock']}",
+                              value:
+                                  "${data!['productsInStock'] ?? 0}",
                             ),
                           ),
                         ],
@@ -157,41 +203,197 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                       const SizedBox(height: 16),
 
+                      // =====================================================
                       // PROFIT SUMMARY
+                      // =====================================================
+
                       _sectionCard(
                         title: "Profit Summary",
                         icon: Icons.show_chart_rounded,
                         child: Column(
                           children: [
-                            _row("Daily", formatMoney(data!['dailyProfit']), true),
-                            _row("Weekly", formatMoney(data!['weeklyProfit']), true),
-                            _row("Monthly", formatMoney(data!['monthlyProfit']), true),
+                            // TODAY
+                            _subSectionLabel("Today"),
+
+                            _row(
+                              "Revenue",
+                              formatMoney(
+                                data!['totalRevenueToday'],
+                              ),
+                              null,
+                            ),
+
+                            _row(
+                              "Cost of Goods",
+                              formatMoney(
+                                data!['costToday'],
+                              ),
+                              null,
+                            ),
+
+                            _row(
+                              "Gross Profit",
+                              formatMoney(
+                                data!['grossProfitToday'] ??
+                                    data!['dailyProfit'],
+                              ),
+                              isPositive(
+                                data!['grossProfitToday'] ??
+                                    data!['dailyProfit'],
+                              ),
+                            ),
+
+                            const Divider(
+                              color: Color(0xFF203A5C),
+                            ),
+
+                            // WEEK
+                            _subSectionLabel("This Week"),
+
+                            _row(
+                              "Revenue",
+                              formatMoney(
+                                data!['totalRevenueThisWeek'] ??
+                                    data!['totalSalesThisWeek'],
+                              ),
+                              null,
+                            ),
+
+                            _row(
+                              "Cost of Goods",
+                              formatMoney(
+                                data!['costThisWeek'],
+                              ),
+                              null,
+                            ),
+
+                            _row(
+                              "Gross Profit",
+                              formatMoney(
+                                data!['grossProfitWeek'] ??
+                                    data!['weeklyProfit'],
+                              ),
+                              isPositive(
+                                data!['grossProfitWeek'] ??
+                                    data!['weeklyProfit'],
+                              ),
+                            ),
+
+                            const Divider(
+                              color: Color(0xFF203A5C),
+                            ),
+
+                            // MONTH
+                            _subSectionLabel("This Month"),
+
+                            _row(
+                              "Revenue",
+                              formatMoney(
+                                data!['totalRevenueThisMonth'],
+                              ),
+                              null,
+                            ),
+
+                            _row(
+                              "Cost of Goods",
+                              formatMoney(
+                                data!['costThisMonth'],
+                              ),
+                              null,
+                            ),
+
+                            _row(
+                              "Gross Profit",
+                              formatMoney(
+                                data!['grossProfitMonth'] ??
+                                    data!['monthlyProfit'],
+                              ),
+                              isPositive(
+                                data!['grossProfitMonth'] ??
+                                    data!['monthlyProfit'],
+                              ),
+                            ),
                           ],
                         ),
                       ),
 
                       const SizedBox(height: 16),
 
-                      // NET PROFIT / LOSS
+                      // =====================================================
+                      // BUSINESS EXPENSES
+                      // =====================================================
+
                       _sectionCard(
-                        title: "Net Profit & Loss",
+                        title: "Business Expenses",
+                        icon: Icons.receipt_long_rounded,
+                        child: Column(
+                          children: [
+                            _row(
+                              "Today",
+                              formatMoney(
+                                data!['dailyExpenses'],
+                              ),
+                              null,
+                            ),
+
+                            _row(
+                              "This Week",
+                              formatMoney(
+                                data!['weeklyExpenses'],
+                              ),
+                              null,
+                            ),
+
+                            _row(
+                              "This Month",
+                              formatMoney(
+                                data!['monthlyExpenses'],
+                              ),
+                              null,
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // =====================================================
+                      // NET PROFIT
+                      // =====================================================
+
+                      _sectionCard(
+                        title: "Net Profit",
                         icon: Icons.account_balance_rounded,
                         child: Column(
                           children: [
                             _row(
                               "Today",
-                              formatMoney(data!['netProfitToday']),
-                              (double.tryParse(data!['netProfitToday'].toString()) ?? 0) >= 0,
+                              formatMoney(
+                                data!['netProfitToday'],
+                              ),
+                              isPositive(
+                                data!['netProfitToday'],
+                              ),
                             ),
+
                             _row(
                               "This Week",
-                              formatMoney(data!['netProfitWeek']),
-                              (double.tryParse(data!['netProfitWeek'].toString()) ?? 0) >= 0,
+                              formatMoney(
+                                data!['netProfitWeek'],
+                              ),
+                              isPositive(
+                                data!['netProfitWeek'],
+                              ),
                             ),
+
                             _row(
                               "This Month",
-                              formatMoney(data!['netProfitMonth']),
-                              (double.tryParse(data!['netProfitMonth'].toString()) ?? 0) >= 0,
+                              formatMoney(
+                                data!['netProfitMonth'],
+                              ),
+                              isPositive(
+                                data!['netProfitMonth'],
+                              ),
                             ),
                           ],
                         ),
@@ -199,22 +401,86 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                       const SizedBox(height: 16),
 
+                      // =====================================================
+                      // LOSS
+                      // =====================================================
+
+                      _sectionCard(
+                        title: "Loss",
+                        icon: Icons.trending_down_rounded,
+                        child: Column(
+                          children: [
+                            _row(
+                              "Today",
+                              formatMoney(
+                                data!['dailyLoss'],
+                              ),
+                              null,
+                            ),
+
+                            _row(
+                              "This Week",
+                              formatMoney(
+                                data!['weeklyLoss'],
+                              ),
+                              null,
+                            ),
+
+                            _row(
+                              "This Month",
+                              formatMoney(
+                                data!['monthlyLoss'],
+                              ),
+                              null,
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // =====================================================
                       // DISCOUNTS
+                      // =====================================================
+
                       _sectionCard(
                         title: "Discounts Summary",
                         icon: Icons.local_offer_rounded,
                         child: Column(
                           children: [
-                            _row("Today", formatMoney(data!['totalDiscountToday']), null),
-                            _row("This Week", formatMoney(data!['totalDiscountThisWeek']), null),
-                            _row("This Month", formatMoney(data!['totalDiscountThisMonth']), null),
+                            _row(
+                              "Today",
+                              formatMoney(
+                                data!['totalDiscountToday'],
+                              ),
+                              null,
+                            ),
+
+                            _row(
+                              "This Week",
+                              formatMoney(
+                                data!['totalDiscountThisWeek'],
+                              ),
+                              null,
+                            ),
+
+                            _row(
+                              "This Month",
+                              formatMoney(
+                                data!['totalDiscountThisMonth'],
+                              ),
+                              null,
+                            ),
                           ],
                         ),
                       ),
 
                       const SizedBox(height: 16),
 
-                      // SALES TREND CHART
+                      // =====================================================
+                      // SALES TREND
+                      // =====================================================
+
                       _sectionCard(
                         title: "Sales Trend (Last 7 Days)",
                         icon: Icons.bar_chart_rounded,
@@ -226,30 +492,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                       const SizedBox(height: 16),
 
-                      // TOP SELLING PRODUCTS PIE CHART
+                      // =====================================================
+                      // TOP SELLING PRODUCTS
+                      // =====================================================
+
                       _sectionCard(
                         title: "Top Selling Products",
                         icon: Icons.pie_chart_rounded,
-                        child: (data!['topSellingProductNames'] as List).isEmpty
-                            ? const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 20),
-                                child: Center(
-                                  child: Text(
-                                    "No sales yet today",
-                                    style: TextStyle(color: Color(0xFF8FAADC)),
+                        child:
+                            (data!['topSellingProductNames'] as List?)
+                                        ?.isEmpty ??
+                                    true
+                                ? const Padding(
+                                    padding:
+                                        EdgeInsets.symmetric(
+                                      vertical: 20,
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        "No sales yet today",
+                                        style: TextStyle(
+                                          color:
+                                              Color(0xFF8FAADC),
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                : Column(
+                                    children: [
+                                      SizedBox(
+                                        height: 180,
+                                        child:
+                                            _buildTopSellingPieChart(),
+                                      ),
+
+                                      const SizedBox(height: 12),
+
+                                      ..._buildPieLegend(),
+                                    ],
                                   ),
-                                ),
-                              )
-                            : Column(
-                                children: [
-                                  SizedBox(
-                                    height: 180,
-                                    child: _buildTopSellingPieChart(),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  ..._buildPieLegend(),
-                                ],
-                              ),
                       ),
 
                       const SizedBox(height: 24),
@@ -258,6 +539,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
     );
   }
+
+  // ===============================================================
+  // SUB SECTION LABEL
+  // ===============================================================
+
+  Widget _subSectionLabel(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(
+        top: 4,
+        bottom: 4,
+      ),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          text,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ===============================================================
+  // STAT CARD
+  // ===============================================================
 
   Widget _statCard({
     required IconData icon,
@@ -276,15 +585,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: const Color(0xFF2F5DA8).withOpacity(0.2),
+              color:
+                  const Color(0xFF2F5DA8).withOpacity(0.2),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: const Color(0xFF8FAADC), size: 22),
+            child: Icon(
+              icon,
+              color: const Color(0xFF8FAADC),
+              size: 22,
+            ),
           ),
+
           const SizedBox(width: 14),
+
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
               children: [
                 Text(
                   value,
@@ -294,6 +611,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+
                 Text(
                   label,
                   style: const TextStyle(
@@ -309,6 +627,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  // ===============================================================
+  // SECTION CARD
+  // ===============================================================
+
   Widget _sectionCard({
     required String title,
     required IconData icon,
@@ -322,12 +644,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, color: const Color(0xFF8FAADC), size: 18),
+              Icon(
+                icon,
+                color: const Color(0xFF8FAADC),
+                size: 18,
+              ),
+
               const SizedBox(width: 8),
+
               Text(
                 title,
                 style: const TextStyle(
@@ -338,28 +667,52 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ],
           ),
+
           const SizedBox(height: 14),
+
           child,
         ],
       ),
     );
   }
 
-  Widget _row(String label, String value, bool? positive) {
+  // ===============================================================
+  // ROW
+  // ===============================================================
+
+  Widget _row(
+    String label,
+    String value,
+    bool? positive,
+  ) {
     Color valueColor = Colors.white;
+
     if (positive != null) {
-      valueColor = positive ? const Color(0xFF4CAF50) : Colors.redAccent;
+      valueColor = positive
+          ? const Color(0xFF4CAF50)
+          : Colors.redAccent;
     }
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(
+        vertical: 6,
+      ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisAlignment:
+            MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: const TextStyle(color: Color(0xFF8FAADC), fontSize: 13),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: Color(0xFF8FAADC),
+                fontSize: 13,
+              ),
+            ),
           ),
+
+          const SizedBox(width: 10),
+
           Text(
             value,
             style: TextStyle(
@@ -373,51 +726,103 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildSalesTrendChart() {
-    final labels = List<String>.from(data!['salesTrendLabels'] ?? []);
-    final values = (data!['salesTrendData'] as List)
-        .map((e) => double.tryParse(e.toString()) ?? 0.0)
-        .toList();
+  // ===============================================================
+  // SALES TREND CHART
+  // ===============================================================
 
-    if (values.isEmpty || values.every((v) => v == 0)) {
+  Widget _buildSalesTrendChart() {
+    final labels =
+        List<String>.from(
+      data!['salesTrendLabels'] ?? [],
+    );
+
+    final values =
+        (data!['salesTrendData'] as List? ?? [])
+            .map(
+              (e) =>
+                  double.tryParse(e.toString()) ??
+                  0.0,
+            )
+            .toList();
+
+    if (values.isEmpty ||
+        values.every((v) => v == 0)) {
       return const Center(
         child: Text(
           "No sales data yet",
-          style: TextStyle(color: Color(0xFF8FAADC)),
+          style: TextStyle(
+            color: Color(0xFF8FAADC),
+          ),
         ),
       );
     }
 
-    final maxY = values.reduce((a, b) => a > b ? a : b) * 1.2;
+    final highestValue =
+        values.reduce(
+          (a, b) => a > b ? a : b,
+        );
+
+      final double maxY =
+          highestValue == 0
+              ? 10.0
+              : highestValue * 1.2;
 
     return BarChart(
       BarChartData(
-        maxY: maxY == 0 ? 10 : maxY,
-        barTouchData: BarTouchData(enabled: true),
+        maxY: maxY,
+
+        barTouchData: BarTouchData(
+          enabled: true,
+        ),
+
         titlesData: FlTitlesData(
-          leftTitles: const AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
+          leftTitles:
+              const AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: false,
+            ),
           ),
-          rightTitles: const AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
+
+          rightTitles:
+              const AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: false,
+            ),
           ),
-          topTitles: const AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
+
+          topTitles:
+              const AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: false,
+            ),
           ),
-          bottomTitles: AxisTitles(
+
+          bottomTitles:
+              AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
-              getTitlesWidget: (value, meta) {
-                final index = value.toInt();
-                if (index < 0 || index >= labels.length) {
+              getTitlesWidget:
+                  (value, meta) {
+                final index =
+                    value.toInt();
+
+                if (index < 0 ||
+                    index >=
+                        labels.length) {
                   return const SizedBox();
                 }
+
                 return Padding(
-                  padding: const EdgeInsets.only(top: 6),
+                  padding:
+                      const EdgeInsets.only(
+                    top: 6,
+                  ),
                   child: Text(
                     labels[index],
-                    style: const TextStyle(
-                      color: Color(0xFF8FAADC),
+                    style:
+                        const TextStyle(
+                      color:
+                          Color(0xFF8FAADC),
                       fontSize: 10,
                     ),
                   ),
@@ -426,78 +831,153 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
         ),
-        borderData: FlBorderData(show: false),
-        gridData: const FlGridData(show: false),
-        barGroups: List.generate(values.length, (index) {
-          return BarChartGroupData(
-            x: index,
-            barRods: [
-              BarChartRodData(
-                toY: values[index],
-                color: const Color(0xFF2F5DA8),
-                width: 18,
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ],
-          );
-        }),
+
+        borderData:
+            FlBorderData(
+          show: false,
+        ),
+
+        gridData:
+            const FlGridData(
+          show: false,
+        ),
+
+        barGroups:
+            List.generate(
+          values.length,
+          (index) {
+            return BarChartGroupData(
+              x: index,
+              barRods: [
+                BarChartRodData(
+                  toY: values[index],
+                  color:
+                      const Color(0xFF2F5DA8),
+                  width: 18,
+                  borderRadius:
+                      BorderRadius.circular(
+                    4,
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
 
+  // ===============================================================
+  // TOP SELLING PIE CHART
+  // ===============================================================
+
   Widget _buildTopSellingPieChart() {
-    final names = List<String>.from(data!['topSellingProductNames'] ?? []);
-    final values = (data!['topSellingProductSales'] as List)
-        .map((e) => double.tryParse(e.toString()) ?? 0.0)
-        .toList();
+    final names =
+        List<String>.from(
+      data!['topSellingProductNames'] ??
+          [],
+    );
+
+    final values =
+        (data!['topSellingProductSales']
+                    as List? ??
+                [])
+            .map(
+              (e) =>
+                  double.tryParse(
+                    e.toString(),
+                  ) ??
+                  0.0,
+            )
+            .toList();
 
     return PieChart(
       PieChartData(
         sectionsSpace: 2,
         centerSpaceRadius: 36,
-        sections: List.generate(names.length, (index) {
-          return PieChartSectionData(
-            value: values[index],
-            color: pieColors[index % pieColors.length],
-            title: '',
-            radius: 60,
-          );
-        }),
+
+        sections:
+            List.generate(
+          names.length,
+          (index) {
+            return PieChartSectionData(
+              value: values[index],
+              color: pieColors[
+                  index % pieColors.length],
+              title: '',
+              radius: 60,
+            );
+          },
+        ),
       ),
     );
   }
 
-  List<Widget> _buildPieLegend() {
-    final names = List<String>.from(data!['topSellingProductNames'] ?? []);
-    final values = (data!['topSellingProductSales'] as List);
+  // ===============================================================
+  // PIE LEGEND
+  // ===============================================================
 
-    return List.generate(names.length, (index) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(
-          children: [
-            Container(
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(
-                color: pieColors[index % pieColors.length],
-                shape: BoxShape.circle,
+  List<Widget> _buildPieLegend() {
+    final names =
+        List<String>.from(
+      data!['topSellingProductNames'] ??
+          [],
+    );
+
+    final values =
+        (data!['topSellingProductSales']
+                    as List? ??
+                []);
+
+    return List.generate(
+      names.length,
+      (index) {
+        return Padding(
+          padding:
+              const EdgeInsets.symmetric(
+            vertical: 4,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 10,
+                height: 10,
+                decoration:
+                    BoxDecoration(
+                  color: pieColors[
+                      index %
+                          pieColors.length],
+                  shape:
+                      BoxShape.circle,
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                names[index],
-                style: const TextStyle(color: Colors.white, fontSize: 13),
+
+              const SizedBox(width: 8),
+
+              Expanded(
+                child: Text(
+                  names[index],
+                  style:
+                      const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                  ),
+                ),
               ),
-            ),
-            Text(
-              "${values[index]} sold",
-              style: const TextStyle(color: Color(0xFF8FAADC), fontSize: 12),
-            ),
-          ],
-        ),
-      );
-    });
+
+              Text(
+                "${values[index]} sold",
+                style:
+                    const TextStyle(
+                  color:
+                      Color(0xFF8FAADC),
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 }

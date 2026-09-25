@@ -356,7 +356,11 @@ class _StockTransferScreenState extends State<StockTransferScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => const SubscriptionScreen(),
+        builder: (_) => SubscriptionScreen(
+          onActivated: () {
+            Navigator.pop(context);
+          },
+        ),
       ),
     );
   }

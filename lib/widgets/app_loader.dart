@@ -105,7 +105,7 @@ class FullScreenLoader extends StatelessWidget {
             const SizedBox(height: 28),
 
             const Text(
-              "Stock X",
+              "Bloommonie",
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 20,

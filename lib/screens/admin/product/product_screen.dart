@@ -16,6 +16,7 @@ class _ProductScreenState extends State<ProductScreen> {
   bool loading = false;
 
   final _formKey = GlobalKey<FormState>();
+
   final _nameController = TextEditingController();
   final _barcodeController = TextEditingController();
   final _priceController = TextEditingController();
@@ -30,6 +31,7 @@ class _ProductScreenState extends State<ProductScreen> {
 
   List categories = [];
   List shops = [];
+
   int? selectedCategoryId;
   int? selectedShopId;
 
@@ -55,53 +57,119 @@ class _ProductScreenState extends State<ProductScreen> {
     _stockLimitController.dispose();
     _stockUnitController.dispose();
     _unitSizeController.dispose();
+
     super.dispose();
   }
 
+  // ============================================================
+  // FETCH PRODUCTS
+  // ============================================================
+
   Future<void> fetchProducts() async {
+    if (!mounted) return;
+
     setState(() => loading = true);
-    final data = await ProductService.getProducts();
-    setState(() {
-      products = data;
-      loading = false;
-    });
+
+    try {
+      final data = await ProductService.getProducts();
+
+      if (!mounted) return;
+
+      setState(() {
+        products = data;
+        loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() => loading = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Failed to load products: $e"),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
   }
+
+  // ============================================================
+  // FETCH CATEGORIES + SHOPS
+  // ============================================================
 
   Future<void> fetchDropdowns() async {
     try {
       final cats = await CategoryService.getCategories();
       final shs = await ShopService.getShops();
 
+      if (!mounted) return;
+
       setState(() {
         categories = cats;
         shops = shs;
       });
     } catch (e) {
-      print("Dropdown Error: $e");
+      debugPrint("Dropdown Error: $e");
     }
   }
 
+  // ============================================================
+  // DELETE PRODUCT
+  // ============================================================
+
   Future<void> deleteProduct(int id) async {
-    final res = await ProductService.deleteProduct(id);
-    if (res['status'] == true) {
+    try {
+      final res = await ProductService.deleteProduct(id);
+
       if (!mounted) return;
+
+      if (res['status'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Product deleted"),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+
+        fetchProducts();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              res['message'] ?? "Failed to delete product",
+            ),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Product deleted"),
+        SnackBar(
+          content: Text("Failed to delete product: $e"),
           backgroundColor: Colors.redAccent,
         ),
       );
-      fetchProducts();
     }
   }
+
+  // ============================================================
+  // GENERATE BARCODE
+  // ============================================================
 
   void _generateBarcode() {
     final code = 'BC${DateTime.now().millisecondsSinceEpoch}';
     _barcodeController.text = code;
   }
 
+  // ============================================================
+  // CLEAR FORM
+  // ============================================================
+
   void _clearForm() {
     _formKey.currentState?.reset();
+
     _nameController.clear();
     _barcodeController.clear();
     _priceController.clear();
@@ -110,20 +178,45 @@ class _ProductScreenState extends State<ProductScreen> {
     _stockLimitController.clear();
     _stockUnitController.clear();
     _unitSizeController.clear();
-    setState(() {
-      selectedCategoryId = null;
-      selectedShopId = null;
-      _showUnitDetails = false;
-    });
+
+    selectedCategoryId = null;
+    selectedShopId = null;
+    _showUnitDetails = false;
   }
 
-  Future<void> _submitProduct() async {
-    if (!_formKey.currentState!.validate()) return;
+  // ============================================================
+  // ADD PRODUCT
+  // ============================================================
+
+  Future<void> _submitProduct(BuildContext sheetContext) async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    if (selectedCategoryId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Please select a category"),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    if (selectedShopId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Please select a shop"),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
 
     if (_barcodeController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("Please generate a barcode first"),
+          content: Text("Please generate or enter a barcode"),
           backgroundColor: Colors.orange,
         ),
       );
@@ -132,343 +225,876 @@ class _ProductScreenState extends State<ProductScreen> {
 
     setState(() => _submitting = true);
 
-    final res = await ProductService.createProduct(
-      categoryId: selectedCategoryId!,
-      shopId: selectedShopId!,
-      name: _nameController.text.trim(),
-      barcode: _barcodeController.text.trim(),
-      price: double.parse(_priceController.text),
-      costPrice: double.parse(_costPriceController.text),
-      stockQuantity: int.parse(_stockQuantityController.text),
-      stockLimit: int.tryParse(_stockLimitController.text) ?? 0,
-      stockUnit: _stockUnitController.text.trim(),
-      unitSize: int.tryParse(_unitSizeController.text),
-    );
-
-    setState(() => _submitting = false);
-
-    if (!mounted) return;
-
-    if (res['status'] == true) {
-      Navigator.pop(context);
-      _clearForm();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Product added successfully"),
-          backgroundColor: accentBlue,
-        ),
+    try {
+      final res = await ProductService.createProduct(
+        categoryId: selectedCategoryId!,
+        shopId: selectedShopId!,
+        name: _nameController.text.trim(),
+        barcode: _barcodeController.text.trim(),
+        price: double.parse(_priceController.text),
+        costPrice: double.parse(_costPriceController.text),
+        stockQuantity: double.parse(_stockQuantityController.text),
+        stockLimit: double.tryParse(_stockLimitController.text) ?? 0,
+        stockUnit: _stockUnitController.text.trim(),
+        unitSize: _unitSizeController.text.trim().isEmpty
+            ? null
+            : double.tryParse(_unitSizeController.text),
       );
-      fetchProducts();
-    } else {
+
+      if (!mounted) return;
+
+      setState(() => _submitting = false);
+
+      if (res['status'] == true) {
+        Navigator.of(sheetContext).pop();
+
+        _clearForm();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Product added successfully"),
+            backgroundColor: accentBlue,
+          ),
+        );
+
+        await fetchProducts();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              res['message'] ?? "Something went wrong",
+            ),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() => _submitting = false);
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(res['message'] ?? "Something went wrong"),
+          content: Text("Failed to add product: $e"),
           backgroundColor: Colors.redAccent,
         ),
       );
     }
   }
 
+  // ============================================================
+  // OPEN ADD PRODUCT SHEET
+  // ============================================================
+
   void _openAddProductSheet() {
+    _clearForm();
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: cardColor,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(24),
+        ),
       ),
-      builder: (context) => StatefulBuilder(
-        builder: (context, setSheetState) {
-          return DraggableScrollableSheet(
-            initialChildSize: 0.92,
-            minChildSize: 0.5,
-            maxChildSize: 0.97,
-            expand: false,
-            builder: (_, scrollController) {
-              return Padding(
-                padding: EdgeInsets.only(
-                  left: 20,
-                  right: 20,
-                  top: 16,
-                  bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-                ),
-                child: Form(
-                  key: _formKey,
-                  child: ListView(
-                    controller: scrollController,
-                    children: [
-                      Center(
-                        child: Container(
-                          width: 40,
-                          height: 4,
-                          margin: const EdgeInsets.only(bottom: 16),
-                          decoration: BoxDecoration(
-                            color: softBlue.withOpacity(0.4),
-                            borderRadius: BorderRadius.circular(10),
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            return DraggableScrollableSheet(
+              initialChildSize: 0.92,
+              minChildSize: 0.5,
+              maxChildSize: 0.97,
+              expand: false,
+              builder: (_, scrollController) {
+                return Padding(
+                  padding: EdgeInsets.only(
+                    left: 20,
+                    right: 20,
+                    top: 16,
+                    bottom:
+                        MediaQuery.of(sheetContext).viewInsets.bottom + 20,
+                  ),
+                  child: Form(
+                    key: _formKey,
+                    child: ListView(
+                      controller: scrollController,
+                      children: [
+                        _buildSheetHandle(),
+
+                        const Text(
+                          "Add New Product",
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
                           ),
                         ),
-                      ),
 
-                      const Text(
-                        "Add New Product",
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                        const SizedBox(height: 20),
+
+                        _buildProductFormFields(
+                          setSheetState: setSheetState,
                         ),
-                      ),
-                      const SizedBox(height: 20),
 
-                      // SELECT SHOP
-                      _buildLabel("Select Shop"),
-                      DropdownButtonFormField<int>(
-                        value: selectedShopId,
-                        dropdownColor: bgColor,
-                        style: const TextStyle(color: Colors.white),
-                        hint: const Text("-- Select Shop --",
-                            style: TextStyle(color: softBlue)),
-                        decoration: _inputDecoration(),
-                        items: shops.map<DropdownMenuItem<int>>((shop) {
-                          return DropdownMenuItem<int>(
-                            value: shop['id'],
-                            child: Text(shop['name'],
-                                style: const TextStyle(color: Colors.white)),
-                          );
-                        }).toList(),
-                        onChanged: (val) =>
-                            setSheetState(() => selectedShopId = val),
-                        validator: (val) =>
-                            val == null ? "Please select a shop" : null,
-                      ),
-                      const SizedBox(height: 14),
+                        const SizedBox(height: 24),
 
-                      // SELECT CATEGORY
-                      _buildLabel("Category"),
-                      DropdownButtonFormField<int>(
-                        value: selectedCategoryId,
-                        dropdownColor: bgColor,
-                        style: const TextStyle(color: Colors.white),
-                        hint: const Text("-- Select Category --",
-                            style: TextStyle(color: softBlue)),
-                        decoration: _inputDecoration(),
-                        items: categories.map<DropdownMenuItem<int>>((cat) {
-                          return DropdownMenuItem<int>(
-                            value: cat['id'],
-                            child: Text(cat['name'],
-                                style: const TextStyle(color: Colors.white)),
-                          );
-                        }).toList(),
-                        onChanged: (val) =>
-                            setSheetState(() => selectedCategoryId = val),
-                        validator: (val) =>
-                            val == null ? "Please select a category" : null,
-                      ),
-                      const SizedBox(height: 14),
-
-                      _buildLabel("Product Name"),
-                      _buildTextField(
-                        controller: _nameController,
-                        hint: "e.g. Coca-Cola 50cl",
-                        validator: (val) =>
-                            val!.isEmpty ? "Product name is required" : null,
-                      ),
-                      const SizedBox(height: 14),
-
-                      _buildLabel("Price (Per Item)"),
-                      _buildTextField(
-                        controller: _priceController,
-                        hint: "0.00",
-                        prefix: "₦",
-                        keyboardType: TextInputType.number,
-                        validator: (val) =>
-                            val!.isEmpty ? "Price is required" : null,
-                      ),
-                      const SizedBox(height: 14),
-
-                      _buildLabel("Cost Price (Per Item)"),
-                      _buildTextField(
-                        controller: _costPriceController,
-                        hint: "0.00",
-                        prefix: "₦",
-                        keyboardType: TextInputType.number,
-                        validator: (val) =>
-                            val!.isEmpty ? "Cost price is required" : null,
-                      ),
-                      const SizedBox(height: 14),
-
-                      _buildLabel("Stock Quantity"),
-                      _buildTextField(
-                        controller: _stockQuantityController,
-                        hint: "0",
-                        keyboardType: TextInputType.number,
-                        validator: (val) =>
-                            val!.isEmpty ? "Stock quantity is required" : null,
-                      ),
-                      const SizedBox(height: 14),
-
-                      _buildLabel("Stock Limit (Low stock alert threshold)"),
-                      _buildTextField(
-                        controller: _stockLimitController,
-                        hint: "0",
-                        keyboardType: TextInputType.number,
-                      ),
-                      const SizedBox(height: 14),
-
-                      OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: accentBlue.withOpacity(0.5)),
-                          foregroundColor: softBlue,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
+                        _buildSubmitButton(
+                          text: "Add Product",
+                          onPressed: _submitting
+                              ? null
+                              : () => _submitProduct(sheetContext),
                         ),
-                        onPressed: () => setSheetState(
-                            () => _showUnitDetails = !_showUnitDetails),
-                        icon: Icon(
-                            _showUnitDetails ? Icons.remove : Icons.add,
-                            color: softBlue),
-                        label: Text(_showUnitDetails
-                            ? "Hide Unit Details"
-                            : "Show Unit Details"),
-                      ),
 
-                      if (_showUnitDetails) ...[
-                        const SizedBox(height: 14),
-                        _buildLabel("Stock Unit (e.g. bags, kg, litres)"),
-                        _buildTextField(
-                          controller: _stockUnitController,
-                          hint: "bags",
-                        ),
-                        const SizedBox(height: 14),
-                        _buildLabel("Unit Size (e.g. 1 bag = 50kg, enter 50)"),
-                        _buildTextField(
-                          controller: _unitSizeController,
-                          hint: "50",
-                          keyboardType: TextInputType.number,
-                        ),
+                        const SizedBox(height: 10),
                       ],
-                      const SizedBox(height: 14),
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
 
-                      _buildLabel("Barcode"),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildTextField(
-                              controller: _barcodeController,
-                              hint: "Scan or generate",
+  // ============================================================
+  // OPEN EDIT PRODUCT SHEET
+  // ============================================================
+
+  void _openEditProductSheet(Map<String, dynamic> product) {
+    // ----------------------------------------------------------
+    // Fill form with existing product information
+    // ----------------------------------------------------------
+
+    _nameController.text = product['name']?.toString() ?? '';
+
+    _barcodeController.text =
+        product['barcode']?.toString() ?? '';
+
+    _priceController.text =
+        product['price']?.toString() ?? '';
+
+    _costPriceController.text =
+        product['cost_price']?.toString() ?? '';
+
+    _stockQuantityController.text =
+        product['stock_quantity']?.toString() ?? '';
+
+    _stockLimitController.text =
+        product['stock_limit']?.toString() ?? '';
+
+    _stockUnitController.text =
+        product['stock_unit']?.toString() ?? '';
+
+    _unitSizeController.text =
+        product['unit_size']?.toString() ?? '';
+
+    selectedCategoryId =
+        int.tryParse(product['category_id']?.toString() ?? '');
+
+    selectedShopId =
+        int.tryParse(product['shop_id']?.toString() ?? '');
+
+    _showUnitDetails =
+        _stockUnitController.text.trim().isNotEmpty ||
+        _unitSizeController.text.trim().isNotEmpty;
+
+    _submitting = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: cardColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(24),
+        ),
+      ),
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            return DraggableScrollableSheet(
+              initialChildSize: 0.92,
+              minChildSize: 0.5,
+              maxChildSize: 0.97,
+              expand: false,
+              builder: (_, scrollController) {
+                return Padding(
+                  padding: EdgeInsets.only(
+                    left: 20,
+                    right: 20,
+                    top: 16,
+                    bottom:
+                        MediaQuery.of(sheetContext).viewInsets.bottom + 20,
+                  ),
+                  child: Form(
+                    key: _formKey,
+                    child: ListView(
+                      controller: scrollController,
+                      children: [
+                        _buildSheetHandle(),
+
+                        Row(
+                          children: [
+                            const Expanded(
+                              child: Text(
+                                "Edit Product",
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          ElevatedButton(
-                            onPressed: () {
-                              _generateBarcode();
-                              setSheetState(() {});
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: accentBlue,
-                              foregroundColor: Colors.white,
+
+                            Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
+                                horizontal: 10,
+                                vertical: 6,
                               ),
-                            ),
-                            child: const Text("Generate"),
-                          ),
-                        ],
-                      ),
-
-                      if (_barcodeController.text.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: bgColor,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                                color: accentBlue.withOpacity(0.3)),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.qr_code,
-                                  size: 32, color: softBlue),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  _barcodeController.text,
-                                  style: const TextStyle(
-                                    fontFamily: 'monospace',
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
+                              decoration: BoxDecoration(
+                                color: accentBlue.withOpacity(0.2),
+                                borderRadius:
+                                    BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                "#${product['id']}",
+                                style: const TextStyle(
+                                  color: softBlue,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
+
+                        const SizedBox(height: 20),
+
+                        _buildProductFormFields(
+                          setSheetState: setSheetState,
+                        ),
+
+                        const SizedBox(height: 24),
+
+                        _buildSubmitButton(
+                          text: "Update Product",
+                          onPressed: _submitting
+                              ? null
+                              : () => _updateProduct(
+                                    product,
+                                    sheetContext,
+                                    setSheetState,
+                                  ),
+                        ),
+
+                        const SizedBox(height: 10),
                       ],
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
 
-                      const SizedBox(height: 24),
+  // ============================================================
+  // UPDATE PRODUCT
+  // ============================================================
 
-                      SizedBox(
-                        width: double.infinity,
-                        height: 54,
-                        child: ElevatedButton(
-                          onPressed: _submitting ? null : _submitProduct,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: accentBlue,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            elevation: 0,
-                          ),
-                          child: _submitting
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Text(
-                                  "Add Product",
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                    ],
+  Future<void> _updateProduct(
+    Map<String, dynamic> product,
+    BuildContext sheetContext,
+    StateSetter setSheetState,
+  ) async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    if (selectedCategoryId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Please select a category"),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    if (selectedShopId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Please select a shop"),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    if (_barcodeController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Barcode is required"),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    setSheetState(() => _submitting = true);
+
+    try {
+      final productId = int.tryParse(
+        product['id']?.toString() ?? '',
+      );
+
+      if (productId == null) {
+        setSheetState(() => _submitting = false);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Invalid product ID"),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+
+        return;
+      }
+
+      final res = await ProductService.updateProduct(
+        id: productId,
+        categoryId: selectedCategoryId!,
+        shopId: selectedShopId!,
+        name: _nameController.text.trim(),
+        barcode: _barcodeController.text.trim(),
+        price: double.parse(_priceController.text),
+        costPrice: double.parse(_costPriceController.text),
+        stockQuantity:
+            double.parse(_stockQuantityController.text),
+        stockLimit:
+            double.tryParse(_stockLimitController.text) ?? 0,
+        stockUnit: _stockUnitController.text.trim(),
+        unitSize: _unitSizeController.text.trim().isEmpty
+            ? null
+            : double.tryParse(_unitSizeController.text),
+      );
+
+      if (!mounted) return;
+
+      setSheetState(() => _submitting = false);
+
+      if (res['status'] == true) {
+        Navigator.of(sheetContext).pop();
+
+        _clearForm();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Product updated successfully"),
+            backgroundColor: accentBlue,
+          ),
+        );
+
+        await fetchProducts();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              res['message'] ?? "Failed to update product",
+            ),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      setSheetState(() => _submitting = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Failed to update product: $e"),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
+  }
+
+  // ============================================================
+  // COMMON PRODUCT FORM
+  // ============================================================
+
+  Widget _buildProductFormFields({
+    required StateSetter setSheetState,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // SELECT SHOP
+        _buildLabel("Select Shop"),
+
+        DropdownButtonFormField<int>(
+          value: selectedShopId,
+          dropdownColor: bgColor,
+          style: const TextStyle(color: Colors.white),
+          hint: const Text(
+            "-- Select Shop --",
+            style: TextStyle(color: softBlue),
+          ),
+          decoration: _inputDecoration(),
+          items: shops.map<DropdownMenuItem<int>>((shop) {
+            final id = int.tryParse(
+              shop['id']?.toString() ?? '',
+            );
+
+            return DropdownMenuItem<int>(
+              value: id,
+              child: Text(
+                shop['name']?.toString() ?? '',
+                style: const TextStyle(
+                  color: Colors.white,
+                ),
+              ),
+            );
+          }).toList(),
+          onChanged: (val) {
+            setSheetState(() {
+              selectedShopId = val;
+            });
+          },
+          validator: (val) {
+            return val == null
+                ? "Please select a shop"
+                : null;
+          },
+        ),
+
+        const SizedBox(height: 14),
+
+        // SELECT CATEGORY
+        _buildLabel("Category"),
+
+        DropdownButtonFormField<int>(
+          value: selectedCategoryId,
+          dropdownColor: bgColor,
+          style: const TextStyle(color: Colors.white),
+          hint: const Text(
+            "-- Select Category --",
+            style: TextStyle(color: softBlue),
+          ),
+          decoration: _inputDecoration(),
+          items: categories.map<DropdownMenuItem<int>>((cat) {
+            final id = int.tryParse(
+              cat['id']?.toString() ?? '',
+            );
+
+            return DropdownMenuItem<int>(
+              value: id,
+              child: Text(
+                cat['name']?.toString() ?? '',
+                style: const TextStyle(
+                  color: Colors.white,
+                ),
+              ),
+            );
+          }).toList(),
+          onChanged: (val) {
+            setSheetState(() {
+              selectedCategoryId = val;
+            });
+          },
+          validator: (val) {
+            return val == null
+                ? "Please select a category"
+                : null;
+          },
+        ),
+
+        const SizedBox(height: 14),
+
+        // PRODUCT NAME
+        _buildLabel("Product Name"),
+
+        _buildTextField(
+          controller: _nameController,
+          hint: "e.g. Coca-Cola 50cl",
+          validator: (val) {
+            if (val == null || val.trim().isEmpty) {
+              return "Product name is required";
+            }
+
+            return null;
+          },
+        ),
+
+        const SizedBox(height: 14),
+
+        // PRICE
+        _buildLabel("Price (Per Item)"),
+
+        _buildTextField(
+          controller: _priceController,
+          hint: "0.00",
+          prefix: "₦",
+          keyboardType: const TextInputType.numberWithOptions(
+            decimal: true,
+          ),
+          validator: (val) {
+            if (val == null || val.trim().isEmpty) {
+              return "Price is required";
+            }
+
+            if (double.tryParse(val) == null) {
+              return "Enter a valid price";
+            }
+
+            return null;
+          },
+        ),
+
+        const SizedBox(height: 14),
+
+        // COST PRICE
+        _buildLabel("Cost Price (Per Item)"),
+
+        _buildTextField(
+          controller: _costPriceController,
+          hint: "0.00",
+          prefix: "₦",
+          keyboardType: const TextInputType.numberWithOptions(
+            decimal: true,
+          ),
+          validator: (val) {
+            if (val == null || val.trim().isEmpty) {
+              return "Cost price is required";
+            }
+
+            if (double.tryParse(val) == null) {
+              return "Enter a valid cost price";
+            }
+
+            return null;
+          },
+        ),
+
+        const SizedBox(height: 14),
+
+        // STOCK QUANTITY
+        _buildLabel("Stock Quantity"),
+
+        _buildTextField(
+          controller: _stockQuantityController,
+          hint: "0",
+          keyboardType: const TextInputType.numberWithOptions(
+            decimal: true,
+          ),
+          validator: (val) {
+            if (val == null || val.trim().isEmpty) {
+              return "Stock quantity is required";
+            }
+
+            final value = double.tryParse(val);
+
+            if (value == null || value < 0) {
+              return "Enter a valid quantity";
+            }
+
+            return null;
+          },
+        ),
+
+        const SizedBox(height: 14),
+
+        // STOCK LIMIT
+        _buildLabel(
+          "Stock Limit (Low stock alert threshold)",
+        ),
+
+        _buildTextField(
+          controller: _stockLimitController,
+          hint: "0",
+          keyboardType: const TextInputType.numberWithOptions(
+            decimal: true,
+          ),
+          validator: (val) {
+            if (val == null || val.trim().isEmpty) {
+              return null;
+            }
+
+            final value = double.tryParse(val);
+
+            if (value == null || value < 0) {
+              return "Enter a valid stock limit";
+            }
+
+            return null;
+          },
+        ),
+
+        const SizedBox(height: 14),
+
+        // UNIT DETAILS BUTTON
+        OutlinedButton.icon(
+          style: OutlinedButton.styleFrom(
+            side: BorderSide(
+              color: accentBlue.withOpacity(0.5),
+            ),
+            foregroundColor: softBlue,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+          onPressed: () {
+            setSheetState(() {
+              _showUnitDetails = !_showUnitDetails;
+            });
+          },
+          icon: Icon(
+            _showUnitDetails
+                ? Icons.remove
+                : Icons.add,
+            color: softBlue,
+          ),
+          label: Text(
+            _showUnitDetails
+                ? "Hide Unit Details"
+                : "Show Unit Details",
+          ),
+        ),
+
+        // UNIT DETAILS
+        if (_showUnitDetails) ...[
+          const SizedBox(height: 14),
+
+          _buildLabel(
+            "Stock Unit (e.g. bags, kg, litres)",
+          ),
+
+          _buildTextField(
+            controller: _stockUnitController,
+            hint: "bags",
+          ),
+
+          const SizedBox(height: 14),
+
+          _buildLabel(
+            "Unit Size (e.g. 1 bag = 50kg, enter 50)",
+          ),
+
+          _buildTextField(
+            controller: _unitSizeController,
+            hint: "50",
+            keyboardType:
+                const TextInputType.numberWithOptions(
+              decimal: true,
+            ),
+            validator: (val) {
+              if (val == null || val.trim().isEmpty) {
+                return null;
+              }
+
+              final value = double.tryParse(val);
+
+              if (value == null || value < 0) {
+                return "Enter a valid unit size";
+              }
+
+              return null;
+            },
+          ),
+        ],
+
+        const SizedBox(height: 14),
+
+        // BARCODE
+        _buildLabel("Barcode"),
+
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: _buildTextField(
+                controller: _barcodeController,
+                hint: "Scan or generate",
+                validator: (val) {
+                  if (val == null ||
+                      val.trim().isEmpty) {
+                    return "Barcode is required";
+                  }
+
+                  return null;
+                },
+              ),
+            ),
+
+            const SizedBox(width: 8),
+
+            SizedBox(
+              height: 48,
+              child: ElevatedButton(
+                onPressed: () {
+                  _generateBarcode();
+                  setSheetState(() {});
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: accentBlue,
+                  foregroundColor: Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(
+                    horizontal: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius:
+                        BorderRadius.circular(10),
                   ),
                 ),
-              );
-            },
-          );
-        },
+                child: const Text("Generate"),
+              ),
+            ),
+          ],
+        ),
+
+        // BARCODE PREVIEW
+        if (_barcodeController.text.isNotEmpty) ...[
+          const SizedBox(height: 8),
+
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: accentBlue.withOpacity(0.3),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.qr_code,
+                  size: 32,
+                  color: softBlue,
+                ),
+
+                const SizedBox(width: 10),
+
+                Expanded(
+                  child: Text(
+                    _barcodeController.text,
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  // ============================================================
+  // SHEET HANDLE
+  // ============================================================
+
+  Widget _buildSheetHandle() {
+    return Center(
+      child: Container(
+        width: 40,
+        height: 4,
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          color: softBlue.withOpacity(0.4),
+          borderRadius: BorderRadius.circular(10),
+        ),
       ),
     );
   }
 
-  InputDecoration _inputDecoration({String? hint, String? prefix}) {
+  // ============================================================
+  // SUBMIT BUTTON
+  // ============================================================
+
+  Widget _buildSubmitButton({
+    required String text,
+    required VoidCallback? onPressed,
+  }) {
+    return SizedBox(
+      width: double.infinity,
+      height: 54,
+      child: ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: accentBlue,
+          foregroundColor: Colors.white,
+          disabledBackgroundColor:
+              accentBlue.withOpacity(0.5),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          elevation: 0,
+        ),
+        child: _submitting
+            ? const SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
+                ),
+              )
+            : Text(
+                text,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // INPUT DECORATION
+  // ============================================================
+
+  InputDecoration _inputDecoration({
+    String? hint,
+    String? prefix,
+  }) {
     return InputDecoration(
       hintText: hint,
-      hintStyle: const TextStyle(color: softBlue, fontSize: 14),
+      hintStyle: const TextStyle(
+        color: softBlue,
+        fontSize: 14,
+      ),
       prefixText: prefix,
-      prefixStyle: const TextStyle(color: Colors.white),
+      prefixStyle: const TextStyle(
+        color: Colors.white,
+      ),
       filled: true,
       fillColor: bgColor,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide.none,
       ),
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: 14,
+        vertical: 14,
+      ),
     );
   }
+
+  // ============================================================
+  // TEXT FIELD
+  // ============================================================
 
   Widget _buildTextField({
     required TextEditingController controller,
@@ -480,11 +1106,20 @@ class _ProductScreenState extends State<ProductScreen> {
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
-      style: const TextStyle(color: Colors.white),
-      decoration: _inputDecoration(hint: hint, prefix: prefix),
+      style: const TextStyle(
+        color: Colors.white,
+      ),
+      decoration: _inputDecoration(
+        hint: hint,
+        prefix: prefix,
+      ),
       validator: validator,
     );
   }
+
+  // ============================================================
+  // LABEL
+  // ============================================================
 
   Widget _buildLabel(String text) {
     return Padding(
@@ -500,14 +1135,20 @@ class _ProductScreenState extends State<ProductScreen> {
     );
   }
 
+  // ============================================================
+  // BUILD
+  // ============================================================
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: bgColor,
+
       appBar: AppBar(
         backgroundColor: bgColor,
         elevation: 0,
         centerTitle: true,
+
         title: const Text(
           "Products",
           style: TextStyle(
@@ -516,133 +1157,179 @@ class _ProductScreenState extends State<ProductScreen> {
             fontSize: 20,
           ),
         ),
-        iconTheme: const IconThemeData(color: Colors.white),
+
+        iconTheme: const IconThemeData(
+          color: Colors.white,
+        ),
+
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+            icon: const Icon(
+              Icons.refresh_rounded,
+              color: Colors.white,
+            ),
             onPressed: fetchProducts,
           ),
         ],
       ),
+
       body: loading
-          ? const FullScreenLoader(message: "Loading Products...")
+          ? const FullScreenLoader(
+              message: "Loading Products...",
+            )
           : products.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 100,
-                        height: 100,
-                        decoration: BoxDecoration(
-                          color: accentBlue.withOpacity(0.1),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.inventory_2_outlined,
-                          size: 48,
-                          color: softBlue,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      const Text(
-                        "No products yet",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      const Text(
-                        "Tap + to add your first product",
-                        style: TextStyle(color: softBlue, fontSize: 14),
-                      ),
-                    ],
-                  ),
-                )
+              ? _buildEmptyState()
               : RefreshIndicator(
                   onRefresh: fetchProducts,
                   color: accentBlue,
                   backgroundColor: cardColor,
+
                   child: ListView.builder(
                     padding: const EdgeInsets.all(16),
                     itemCount: products.length,
+
                     itemBuilder: (context, index) {
                       final p = products[index];
-                      final isLowStock = (double.tryParse(
-                                  p['stock_quantity'].toString()) ??
-                              0) <=
-                          (double.tryParse(p['stock_limit'].toString()) ?? 0);
+
+                      final stockQuantity =
+                          double.tryParse(
+                                p['stock_quantity']
+                                    ?.toString() ??
+                                    '0',
+                              ) ??
+                              0;
+
+                      final stockLimit =
+                          double.tryParse(
+                                p['stock_limit']
+                                    ?.toString() ??
+                                    '0',
+                              ) ??
+                              0;
+
+                      final isLowStock =
+                          stockLimit > 0 &&
+                          stockQuantity <= stockLimit;
 
                       return Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.all(16),
+                        margin:
+                            const EdgeInsets.only(bottom: 12),
+
+                        padding:
+                            const EdgeInsets.all(16),
+
                         decoration: BoxDecoration(
                           color: cardColor,
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius:
+                              BorderRadius.circular(16),
+
                           border: isLowStock
                               ? Border.all(
-                                  color: Colors.orange.withOpacity(0.5))
+                                  color: Colors.orange
+                                      .withOpacity(0.5),
+                                )
                               : null,
                         ),
+
                         child: Row(
                           children: [
+                            // PRODUCT ICON
                             Container(
                               width: 46,
                               height: 46,
+
                               decoration: BoxDecoration(
-                                color: accentBlue.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(12),
+                                color: accentBlue
+                                    .withOpacity(0.2),
+                                borderRadius:
+                                    BorderRadius.circular(12),
                               ),
+
                               child: const Icon(
                                 Icons.inventory_2_rounded,
                                 color: softBlue,
                               ),
                             ),
+
                             const SizedBox(width: 14),
+
+                            // PRODUCT INFORMATION
                             Expanded(
                               child: Column(
                                 crossAxisAlignment:
                                     CrossAxisAlignment.start,
+
                                 children: [
                                   Text(
-                                    p['name'] ?? '',
-                                    style: const TextStyle(
+                                    p['name']?.toString() ??
+                                        '',
+                                    style:
+                                        const TextStyle(
                                       color: Colors.white,
-                                      fontWeight: FontWeight.w600,
+                                      fontWeight:
+                                          FontWeight.w600,
                                       fontSize: 16,
                                     ),
                                   ),
+
                                   const SizedBox(height: 4),
+
                                   Text(
                                     "₦${p['price']} • Stock: ${p['stock_quantity']}",
-                                    style: const TextStyle(
+                                    style:
+                                        const TextStyle(
                                       color: softBlue,
                                       fontSize: 13,
                                     ),
                                   ),
+
                                   if (isLowStock)
                                     const Padding(
-                                      padding: EdgeInsets.only(top: 4),
+                                      padding:
+                                          EdgeInsets.only(
+                                        top: 4,
+                                      ),
                                       child: Text(
                                         "⚠️ Low stock",
                                         style: TextStyle(
-                                          color: Colors.orange,
+                                          color:
+                                              Colors.orange,
                                           fontSize: 12,
-                                          fontWeight: FontWeight.w600,
+                                          fontWeight:
+                                              FontWeight.w600,
                                         ),
                                       ),
                                     ),
                                 ],
                               ),
                             ),
+
+                            // EDIT
                             IconButton(
+                              tooltip: "Edit Product",
+                              icon: const Icon(
+                                Icons.edit_outlined,
+                                color: softBlue,
+                              ),
+                              onPressed: () {
+                                _openEditProductSheet(
+                                  Map<String, dynamic>.from(p),
+                                );
+                              },
+                            ),
+
+                            // DELETE
+                            IconButton(
+                              tooltip: "Delete Product",
                               icon: const Icon(
                                 Icons.delete_outline_rounded,
                                 color: Colors.redAccent,
                               ),
-                              onPressed: () => deleteProduct(p['id']),
+                              onPressed: () {
+                                _showDeleteConfirmation(
+                                  p,
+                                );
+                              },
                             ),
                           ],
                         ),
@@ -650,11 +1337,131 @@ class _ProductScreenState extends State<ProductScreen> {
                     },
                   ),
                 ),
+
       floatingActionButton: FloatingActionButton(
         onPressed: _openAddProductSheet,
         backgroundColor: accentBlue,
-        child: const Icon(Icons.add_rounded, color: Colors.white),
+        child: const Icon(
+          Icons.add_rounded,
+          color: Colors.white,
+        ),
       ),
+    );
+  }
+
+  // ============================================================
+  // EMPTY STATE
+  // ============================================================
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 100,
+            height: 100,
+
+            decoration: BoxDecoration(
+              color: accentBlue.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+
+            child: const Icon(
+              Icons.inventory_2_outlined,
+              size: 48,
+              color: softBlue,
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          const Text(
+            "No products yet",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+
+          const SizedBox(height: 6),
+
+          const Text(
+            "Tap + to add your first product",
+            style: TextStyle(
+              color: softBlue,
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // DELETE CONFIRMATION
+  // ============================================================
+
+  void _showDeleteConfirmation(
+    Map<String, dynamic> product,
+  ) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: cardColor,
+
+          title: const Text(
+            "Delete Product?",
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+
+          content: Text(
+            "Are you sure you want to delete "
+            "\"${product['name'] ?? 'this product'}\"?",
+            style: const TextStyle(
+              color: softBlue,
+            ),
+          ),
+
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+              },
+              child: const Text(
+                "Cancel",
+                style: TextStyle(
+                  color: softBlue,
+                ),
+              ),
+            ),
+
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () async {
+                Navigator.of(dialogContext).pop();
+
+                final id = int.tryParse(
+                  product['id']?.toString() ?? '',
+                );
+
+                if (id != null) {
+                  await deleteProduct(id);
+                }
+              },
+              child: const Text("Delete"),
+            ),
+          ],
+        );
+      },
     );
   }
 }

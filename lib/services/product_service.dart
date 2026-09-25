@@ -68,35 +68,43 @@ class ProductService {
   }
 
   // UPDATE PRODUCT
-  static Future<Map<String, dynamic>> updateProduct({
-    required int id,
-    required int categoryId,
-    required int shopId,
-    required String name,
-    required double price,
-    required double costPrice,
-    required int stockQuantity,
-  }) async {
-    final token = await AuthService.getToken();
+static Future<Map<String, dynamic>> updateProduct({
+  required int id,
+  required int categoryId,
+  required int shopId,
+  required String name,
+  required String barcode,
+  required double price,
+  required double costPrice,
+  required double stockQuantity,
+  required double stockLimit,
+  String? stockUnit,
+  double? unitSize,
+}) async {
+  final token = await AuthService.getToken();
 
-    final response = await http.put(
-      Uri.parse("$baseUrl/products/$id"),
-      headers: {
-        "Accept": "application/json",
-        "Authorization": "Bearer $token",
-      },
-      body: {
-        "category_id": categoryId.toString(),
-        "shop_id": shopId.toString(),
-        "name": name,
-        "price": price.toString(),
-        "cost_price": costPrice.toString(),
-        "stock_quantity": stockQuantity.toString(),
-      },
-    );
+  final response = await http.put(
+    Uri.parse("$baseUrl/products/$id"),
+    headers: {
+      "Accept": "application/json",
+      "Authorization": "Bearer $token",
+    },
+    body: {
+      "category_id": categoryId.toString(),
+      "shop_id": shopId.toString(),
+      "name": name,
+      "barcode": barcode,
+      "price": price.toString(),
+      "cost_price": costPrice.toString(),
+      "stock_quantity": stockQuantity.toString(),
+      "stock_limit": stockLimit.toString(),
+      "stock_unit": stockUnit ?? "",
+      "unit_size": unitSize?.toString() ?? "",
+    },
+  );
 
-    return jsonDecode(response.body);
-  }
+  return jsonDecode(response.body);
+}
 
   // DELETE PRODUCT
   static Future<Map<String, dynamic>> deleteProduct(int id) async {
