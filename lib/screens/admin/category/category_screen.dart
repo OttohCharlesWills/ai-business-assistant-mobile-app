@@ -366,6 +366,280 @@ class _CategoryScreenState extends State<CategoryScreen> {
   }
 
   // ============================================================
+  // EDIT CATEGORY
+  // ============================================================
+
+  Future<void> showEditDialog(
+    int id,
+    String currentName,
+  ) async {
+    final nameController =
+        TextEditingController(text: currentName);
+
+    bool saving = false;
+
+    await showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setStateDialog) => Dialog(
+          backgroundColor: const Color(0xFF0F2847),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ICON
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2F5DA8).withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(
+                    Icons.edit_rounded,
+                    color: Color(0xFF8FAADC),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // TITLE
+                const Text(
+                  "Edit Category",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
+                ),
+
+                const SizedBox(height: 4),
+
+                const Text(
+                  "Update the category name",
+                  style: TextStyle(
+                    color: Color(0xFF8FAADC),
+                    fontSize: 13,
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                // INPUT
+                Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0C1F3F),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: TextField(
+                    controller: nameController,
+                    autofocus: true,
+                    textInputAction: TextInputAction.done,
+                    style: const TextStyle(
+                      color: Colors.white,
+                    ),
+                    decoration: const InputDecoration(
+                      hintText: "Category name",
+                      hintStyle: TextStyle(
+                        color: Color(0xFF8FAADC),
+                        fontSize: 14,
+                      ),
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 16,
+                      ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+
+                // BUTTONS
+                Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 50,
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(
+                              color: const Color(0xFF2F5DA8)
+                                  .withOpacity(0.4),
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius:
+                                  BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: saving
+                              ? null
+                              : () {
+                                  Navigator.pop(dialogContext);
+                                },
+                          child: const Text(
+                            "Cancel",
+                            style: TextStyle(
+                              color: Color(0xFF8FAADC),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(width: 12),
+
+                    Expanded(
+                      child: SizedBox(
+                        height: 50,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor:
+                                const Color(0xFF2F5DA8),
+                            disabledBackgroundColor:
+                                const Color(0xFF2F5DA8)
+                                    .withOpacity(0.5),
+                            shape: RoundedRectangleBorder(
+                              borderRadius:
+                                  BorderRadius.circular(12),
+                            ),
+                            elevation: 0,
+                          ),
+                          onPressed: saving
+                              ? null
+                              : () async {
+                                  final name =
+                                      nameController.text.trim();
+
+                                  if (name.isEmpty) {
+                                    ScaffoldMessenger.of(
+                                            context)
+                                        .showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          "Please enter a category name",
+                                        ),
+                                        backgroundColor:
+                                            Colors.redAccent,
+                                      ),
+                                    );
+                                    return;
+                                  }
+
+                                  if (name == currentName) {
+                                    Navigator.pop(dialogContext);
+                                    return;
+                                  }
+
+                                  setStateDialog(
+                                    () => saving = true,
+                                  );
+
+                                  try {
+                                    final response =
+                                        await CategoryService
+                                            .updateCategory(
+                                      id: id,
+                                      name: name,
+                                    );
+
+                                    if (!dialogContext.mounted) {
+                                      return;
+                                    }
+
+                                    Navigator.pop(dialogContext);
+
+                                    if (response['status'] ==
+                                        true) {
+                                      await fetchCategories(
+                                        refresh: true,
+                                      );
+
+                                      if (!mounted) return;
+
+                                      ScaffoldMessenger.of(
+                                              context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            "Category updated successfully",
+                                          ),
+                                          backgroundColor:
+                                              Color(0xFF2F5DA8),
+                                        ),
+                                      );
+                                    } else {
+                                      ScaffoldMessenger.of(
+                                              context)
+                                          .showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            response['message'] ??
+                                                "Failed to update category",
+                                          ),
+                                          backgroundColor:
+                                              Colors.redAccent,
+                                        ),
+                                      );
+                                    }
+                                  } catch (e) {
+                                    if (!dialogContext.mounted) {
+                                      return;
+                                    }
+
+                                    Navigator.pop(dialogContext);
+
+                                    if (!mounted) return;
+
+                                    ScaffoldMessenger.of(context)
+                                        .showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          "Failed to update category: $e",
+                                        ),
+                                        backgroundColor:
+                                            Colors.redAccent,
+                                      ),
+                                    );
+                                  }
+                                },
+                          child: saving
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child:
+                                      CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text(
+                                  "Update",
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    nameController.dispose();
+  }
+
+  // ============================================================
   // DELETE CATEGORY
   // ============================================================
 
@@ -500,6 +774,16 @@ class _CategoryScreenState extends State<CategoryScreen> {
             backgroundColor: Colors.redAccent,
           ),
         );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              response['message'] ??
+                  "Failed to delete category",
+            ),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
       }
     }
   }
@@ -509,7 +793,8 @@ class _CategoryScreenState extends State<CategoryScreen> {
   // ============================================================
 
   Widget _buildEmptyState() {
-    final searching = _searchController.text.trim().isNotEmpty;
+    final searching =
+        _searchController.text.trim().isNotEmpty;
 
     return Center(
       child: Column(
@@ -599,6 +884,10 @@ class _CategoryScreenState extends State<CategoryScreen> {
         ],
       ),
 
+      // ========================================================
+      // ADD CATEGORY BUTTON
+      // ========================================================
+
       floatingActionButton: FloatingActionButton(
         onPressed: showAddDialog,
         backgroundColor: const Color(0xFF2F5DA8),
@@ -607,6 +896,10 @@ class _CategoryScreenState extends State<CategoryScreen> {
           color: Colors.white,
         ),
       ),
+
+      // ========================================================
+      // BODY
+      // ========================================================
 
       body: loading
           ? const FullScreenLoader(
@@ -671,6 +964,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
                                 ),
                                 child: Row(
                                   children: [
+                                    // CATEGORY ICON
                                     Container(
                                       width: 46,
                                       height: 46,
@@ -699,6 +993,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
                                       width: 14,
                                     ),
 
+                                    // CATEGORY NAME
                                     Expanded(
                                       child: Text(
                                         categoryName,
@@ -712,7 +1007,35 @@ class _CategoryScreenState extends State<CategoryScreen> {
                                       ),
                                     ),
 
+                                    // ==================================================
+                                    // EDIT BUTTON
+                                    // ==================================================
+
                                     IconButton(
+                                      tooltip:
+                                          "Edit category",
+                                      onPressed:
+                                          categoryId == null
+                                              ? null
+                                              : () =>
+                                                  showEditDialog(
+                                                    categoryId,
+                                                    categoryName,
+                                                  ),
+                                      icon: const Icon(
+                                        Icons.edit_outlined,
+                                        color:
+                                            Color(0xFF8FAADC),
+                                      ),
+                                    ),
+
+                                    // ==================================================
+                                    // DELETE BUTTON
+                                    // ==================================================
+
+                                    IconButton(
+                                      tooltip:
+                                          "Delete category",
                                       onPressed:
                                           categoryId == null
                                               ? null

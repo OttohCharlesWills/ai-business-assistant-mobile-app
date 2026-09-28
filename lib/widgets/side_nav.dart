@@ -33,7 +33,7 @@ import '../screens/admin/stock/stock_transfer_screen.dart';
 import '../screens/admin/setting/setting_screen.dart';
 
 import '../screens/login_screen.dart';
-
+import '../screens/admin/expenses/admin_expenses_screen.dart';
 import '../screens/admin/plan/plan_screen.dart';
 
 class SideNav extends StatefulWidget {
@@ -243,6 +243,22 @@ class _SideNavState extends State<SideNav> {
                         context,
                         MaterialPageRoute(
                           builder: (_) => const AdminSalesScreen(),
+                        ),
+                      );
+                    },
+                  ),
+
+                  // EXPENSES
+                  _NavItem(
+                    icon: Icons.account_balance_wallet_rounded,
+                    label: "Expenses",
+                    onTap: () {
+                      Navigator.pop(context);
+
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const AdminExpensesScreen(),
                         ),
                       );
                     },

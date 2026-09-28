@@ -157,4 +157,47 @@ class CashierDashboardService {
       return {"success": false, "message": e.toString()};
     }
   }
+
+  static Future<Map<String, dynamic>> getProductByBarcode(
+  String barcode,
+) async {
+  final token = await AuthService.getToken();
+
+  if (token == null || token.isEmpty) {
+    return {
+      'success': false,
+      'message': 'Authentication token not found.',
+    };
+  }
+
+  try {
+    final response = await http.get(
+      Uri.parse(
+        '$baseUrl/barcode/product/${Uri.encodeComponent(barcode)}',
+      ),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Accept': 'application/json',
+      },
+    );
+
+    final data = jsonDecode(response.body);
+
+    if (response.statusCode == 200 &&
+        data['success'] == true) {
+      return Map<String, dynamic>.from(data);
+    }
+
+    return {
+      'success': false,
+      'message': data['message'] ??
+          'Product not found for this barcode.',
+    };
+  } catch (e) {
+    return {
+      'success': false,
+      'message': 'Unable to search barcode.',
+    };
+  }
+}
 }
