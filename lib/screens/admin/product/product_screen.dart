@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
+
 import '../../../services/product_service.dart';
 import '../../../services/category_service.dart';
 import '../../../services/shop_service.dart';
@@ -88,7 +90,6 @@ class _ProductScreenState extends State<ProductScreen> {
         loading = false;
       });
 
-      // Re-apply search if there is an existing search query.
       if (_searchController.text.trim().isNotEmpty) {
         _searchProducts(_searchController.text);
       }
@@ -205,7 +206,39 @@ class _ProductScreenState extends State<ProductScreen> {
 
   void _generateBarcode() {
     final code = 'BC${DateTime.now().millisecondsSinceEpoch}';
+
     _barcodeController.text = code;
+  }
+
+  // ============================================================
+  // SCAN BARCODE
+  // ============================================================
+
+  Future<void> _scanBarcode(
+    StateSetter setSheetState,
+  ) async {
+    final result = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (_) => const _BarcodeScannerScreen(),
+      ),
+    );
+
+    if (!mounted) return;
+
+    if (result != null && result.trim().isNotEmpty) {
+      _barcodeController.text = result.trim();
+
+      setSheetState(() {});
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            "Barcode scanned: ${result.trim()}",
+          ),
+          backgroundColor: accentBlue,
+        ),
+      );
+    }
   }
 
   // ============================================================
@@ -234,7 +267,9 @@ class _ProductScreenState extends State<ProductScreen> {
   // ADD PRODUCT
   // ============================================================
 
-  Future<void> _submitProduct(BuildContext sheetContext) async {
+  Future<void> _submitProduct(
+    BuildContext sheetContext,
+  ) async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -262,7 +297,7 @@ class _ProductScreenState extends State<ProductScreen> {
     if (_barcodeController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("Please generate or enter a barcode"),
+          content: Text("Please scan, generate or enter a barcode"),
           backgroundColor: Colors.orange,
         ),
       );
@@ -280,7 +315,6 @@ class _ProductScreenState extends State<ProductScreen> {
         price: double.parse(_priceController.text),
         costPrice: double.parse(_costPriceController.text),
 
-        // CREATE PRODUCT expects int values
         stockQuantity:
             int.tryParse(_stockQuantityController.text) ?? 0,
 
@@ -446,13 +480,11 @@ class _ProductScreenState extends State<ProductScreen> {
     _unitSizeController.text =
         product['unit_size']?.toString() ?? '';
 
-    selectedCategoryId =
-        int.tryParse(
+    selectedCategoryId = int.tryParse(
       product['category_id']?.toString() ?? '',
     );
 
-    selectedShopId =
-        int.tryParse(
+    selectedShopId = int.tryParse(
       product['shop_id']?.toString() ?? '',
     );
 
@@ -638,7 +670,6 @@ class _ProductScreenState extends State<ProductScreen> {
         costPrice:
             double.parse(_costPriceController.text),
 
-        // UPDATE PRODUCT expects double values
         stockQuantity:
             double.tryParse(
                   _stockQuantityController.text,
@@ -861,7 +892,7 @@ class _ProductScreenState extends State<ProductScreen> {
             }
 
             if (double.tryParse(val) == null) {
-              return "Enter a valid cost price";
+              return "Enter a valid price";
             }
 
             return null;
@@ -993,7 +1024,10 @@ class _ProductScreenState extends State<ProductScreen> {
 
         const SizedBox(height: 14),
 
+        // ======================================================
         // BARCODE
+        // ======================================================
+
         _buildLabel("Barcode"),
 
         Row(
@@ -1003,7 +1037,8 @@ class _ProductScreenState extends State<ProductScreen> {
             Expanded(
               child: _buildTextField(
                 controller: _barcodeController,
-                hint: "Scan or generate",
+                hint: "Type or scan barcode",
+                keyboardType: TextInputType.text,
                 validator: (val) {
                   if (val == null ||
                       val.trim().isEmpty) {
@@ -1017,12 +1052,12 @@ class _ProductScreenState extends State<ProductScreen> {
 
             const SizedBox(width: 8),
 
+            // SCAN
             SizedBox(
               height: 48,
-              child: ElevatedButton(
+              child: ElevatedButton.icon(
                 onPressed: () {
-                  _generateBarcode();
-                  setSheetState(() {});
+                  _scanBarcode(setSheetState);
                 },
                 style:
                     ElevatedButton.styleFrom(
@@ -1042,18 +1077,58 @@ class _ProductScreenState extends State<ProductScreen> {
                     ),
                   ),
                 ),
-                child: const Text(
-                  "Generate",
+                icon: const Icon(
+                  Icons.qr_code_scanner_rounded,
+                  size: 20,
+                ),
+                label: const Text(
+                  "Scan",
                 ),
               ),
             ),
           ],
         ),
 
+        const SizedBox(height: 8),
+
+        // GENERATE
+        SizedBox(
+          height: 44,
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () {
+              _generateBarcode();
+              setSheetState(() {});
+            },
+            style:
+                OutlinedButton.styleFrom(
+              side: BorderSide(
+                color:
+                    accentBlue.withOpacity(
+                  0.5,
+                ),
+              ),
+              foregroundColor: softBlue,
+              shape:
+                  RoundedRectangleBorder(
+                borderRadius:
+                    BorderRadius.circular(
+                  10,
+                ),
+              ),
+            ),
+            icon: const Icon(
+              Icons.auto_awesome,
+              size: 18,
+            ),
+            label: const Text(
+              "Generate Barcode",
+            ),
+          ),
+        ),
+
         // BARCODE PREVIEW
-        if (_barcodeController
-            .text
-            .isNotEmpty) ...[
+        if (_barcodeController.text.isNotEmpty) ...[
           const SizedBox(height: 8),
 
           Container(
@@ -1073,7 +1148,7 @@ class _ProductScreenState extends State<ProductScreen> {
             child: Row(
               children: [
                 const Icon(
-                  Icons.qr_code,
+                  Icons.qr_code_rounded,
                   size: 32,
                   color: softBlue,
                 ),
@@ -1089,8 +1164,24 @@ class _ProductScreenState extends State<ProductScreen> {
                           'monospace',
                       fontWeight:
                           FontWeight.bold,
-                      color: Colors.white,
+                      color:
+                          Colors.white,
                     ),
+                  ),
+                ),
+
+                IconButton(
+                  tooltip:
+                      "Clear barcode",
+                  onPressed: () {
+                    _barcodeController
+                        .clear();
+
+                    setSheetState(() {});
+                  },
+                  icon: const Icon(
+                    Icons.close,
+                    color: softBlue,
                   ),
                 ),
               ],
@@ -1139,7 +1230,8 @@ class _ProductScreenState extends State<ProductScreen> {
         onPressed: onPressed,
         style:
             ElevatedButton.styleFrom(
-          backgroundColor: accentBlue,
+          backgroundColor:
+              accentBlue,
           foregroundColor:
               Colors.white,
           disabledBackgroundColor:
@@ -1900,6 +1992,205 @@ class _ProductScreenState extends State<ProductScreen> {
           ],
         );
       },
+    );
+  }
+}
+
+// ============================================================
+// BARCODE SCANNER SCREEN
+// ============================================================
+
+class _BarcodeScannerScreen extends StatefulWidget {
+  const _BarcodeScannerScreen();
+
+  @override
+  State<_BarcodeScannerScreen> createState() =>
+      _BarcodeScannerScreenState();
+}
+
+class _BarcodeScannerScreenState
+    extends State<_BarcodeScannerScreen> {
+  late final MobileScannerController controller;
+
+  bool scanned = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    controller = MobileScannerController(
+      detectionSpeed: DetectionSpeed.noDuplicates,
+      detectionTimeoutMs: 500,
+    );
+  }
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  void _handleBarcode(BarcodeCapture capture) {
+    if (scanned) return;
+
+    for (final barcode in capture.barcodes) {
+      final value = barcode.rawValue;
+
+      if (value != null &&
+          value.trim().isNotEmpty) {
+        scanned = true;
+
+        controller.stop();
+
+        Navigator.of(context).pop(
+          value.trim(),
+        );
+
+        return;
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        elevation: 0,
+
+        title: const Text(
+          "Scan Product Barcode",
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+
+        actions: [
+          IconButton(
+            tooltip: "Switch Camera",
+            icon: const Icon(
+              Icons.flip_camera_ios,
+            ),
+            onPressed: () {
+              controller.switchCamera();
+            },
+          ),
+          IconButton(
+            tooltip: "Flash",
+            icon: const Icon(
+              Icons.flash_on,
+            ),
+            onPressed: () {
+              controller.toggleTorch();
+            },
+          ),
+        ],
+      ),
+
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // CAMERA
+          MobileScanner(
+            controller: controller,
+            onDetect: _handleBarcode,
+          ),
+
+          // DARK OVERLAY
+          IgnorePointer(
+            child: Container(
+              decoration: BoxDecoration(
+                color:
+                    Colors.black.withOpacity(0.25),
+              ),
+            ),
+          ),
+
+          // SCANNER FRAME
+          Center(
+            child: Container(
+              width: 310,
+              height: 170,
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: accentBlue,
+                  width: 3,
+                ),
+                borderRadius:
+                    BorderRadius.circular(18),
+              ),
+            ),
+          ),
+
+          // TOP INSTRUCTION
+          Positioned(
+            top: 30,
+            left: 20,
+            right: 20,
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(
+                horizontal: 18,
+                vertical: 12,
+              ),
+              decoration: BoxDecoration(
+                color:
+                    Colors.black.withOpacity(0.65),
+                borderRadius:
+                    BorderRadius.circular(12),
+              ),
+              child: const Text(
+                "Place the barcode inside the box",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
+
+          // BOTTOM INSTRUCTION
+          Positioned(
+            left: 20,
+            right: 20,
+            bottom: 40,
+            child: Container(
+              padding:
+                  const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color:
+                    Colors.black.withOpacity(0.75),
+                borderRadius:
+                    BorderRadius.circular(14),
+              ),
+              child: const Column(
+                children: [
+                  Icon(
+                    Icons.qr_code_scanner_rounded,
+                    color: Colors.white,
+                    size: 30,
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    "Scanning automatically...",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

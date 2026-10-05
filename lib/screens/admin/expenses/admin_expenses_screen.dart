@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -104,7 +105,8 @@ class _AdminExpensesScreenState extends State<AdminExpensesScreen> {
 
     if (id == null) return;
 
-    final title = expense['title']?.toString() ?? 'this expense';
+    final title =
+        expense['title']?.toString() ?? 'this expense';
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -240,13 +242,12 @@ class _AdminExpensesScreenState extends State<AdminExpensesScreen> {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) =>
-            const CreateAdminExpenseScreen(),
+        builder: (_) => const AdminExpenseCreateScreen(),
       ),
     );
 
     if (result == true) {
-      _loadExpenses(
+      await _loadExpenses(
         page: _currentPage,
       );
     }
@@ -284,7 +285,8 @@ class _AdminExpensesScreenState extends State<AdminExpensesScreen> {
 
       body: _buildBody(),
 
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton:
+          FloatingActionButton.extended(
         onPressed: _openCreateExpense,
         backgroundColor: const Color(0xFF2F5DA8),
         foregroundColor: Colors.white,
@@ -317,12 +319,16 @@ class _AdminExpensesScreenState extends State<AdminExpensesScreen> {
                 size: 50,
                 color: Colors.red,
               ),
+
               const SizedBox(height: 12),
+
               Text(
                 _error!,
                 textAlign: TextAlign.center,
               ),
+
               const SizedBox(height: 20),
+
               ElevatedButton.icon(
                 onPressed: () => _loadExpenses(
                   page: _currentPage,
@@ -346,12 +352,15 @@ class _AdminExpensesScreenState extends State<AdminExpensesScreen> {
               const AlwaysScrollableScrollPhysics(),
           children: const [
             SizedBox(height: 150),
+
             Icon(
               Icons.receipt_long_outlined,
               size: 70,
               color: Colors.grey,
             ),
+
             SizedBox(height: 15),
+
             Center(
               child: Text(
                 'No expenses found.',
@@ -438,7 +447,9 @@ class _AdminExpensesScreenState extends State<AdminExpensesScreen> {
               color: Colors.white,
             ),
           ),
+
           const SizedBox(width: 14),
+
           Expanded(
             child: Column(
               crossAxisAlignment:
@@ -451,7 +462,9 @@ class _AdminExpensesScreenState extends State<AdminExpensesScreen> {
                     fontSize: 13,
                   ),
                 ),
+
                 const SizedBox(height: 4),
+
                 Text(
                   '₦${_currencyFormat.format(total)}',
                   style: const TextStyle(
@@ -529,7 +542,9 @@ class _AdminExpensesScreenState extends State<AdminExpensesScreen> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
+
                       const SizedBox(height: 4),
+
                       Text(
                         _formatDate(
                           expense['date'],
@@ -542,6 +557,8 @@ class _AdminExpensesScreenState extends State<AdminExpensesScreen> {
                     ],
                   ),
                 ),
+
+                const SizedBox(width: 8),
 
                 Text(
                   _formatAmount(
@@ -574,8 +591,7 @@ class _AdminExpensesScreenState extends State<AdminExpensesScreen> {
                           .trim()
                           .isNotEmpty ==
                       true
-                  ? expense['description']
-                      .toString()
+                  ? expense['description'].toString()
                   : '—',
             ),
 
@@ -626,7 +642,9 @@ class _AdminExpensesScreenState extends State<AdminExpensesScreen> {
           size: 18,
           color: Colors.grey.shade600,
         ),
+
         const SizedBox(width: 8),
+
         Text(
           '$label: ',
           style: TextStyle(
@@ -634,6 +652,7 @@ class _AdminExpensesScreenState extends State<AdminExpensesScreen> {
             fontSize: 13,
           ),
         ),
+
         Expanded(
           child: Text(
             value,
@@ -688,3 +707,4 @@ class _AdminExpensesScreenState extends State<AdminExpensesScreen> {
     );
   }
 }
+
