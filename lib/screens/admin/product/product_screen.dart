@@ -2010,6 +2010,7 @@ class _BarcodeScannerScreen extends StatefulWidget {
 
 class _BarcodeScannerScreenState
     extends State<_BarcodeScannerScreen> {
+  static const Color accentBlue = Color(0xFF2F5DA8);
   late final MobileScannerController controller;
 
   bool scanned = false;
