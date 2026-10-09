@@ -1,11 +1,44 @@
 
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
+import '../helpers/error_helper.dart';
 import '../main.dart';
 import '../screens/subscription_expired_screen.dart';
-import 'package:flutter/material.dart';
+
+// ============================================================
+// CENTRAL REQUEST HANDLER
+// ============================================================
+
+Future<http.Response> _send(
+  Future<http.Response> Function() request,
+) async {
+  try {
+    final response = await request();
+
+    _checkSubscription(response);
+
+    return response;
+  } on SocketException {
+    throw const FriendlyNetworkException();
+  } on TimeoutException {
+    throw const FriendlyNetworkException();
+  } on http.ClientException catch (e) {
+    if (isNetworkError(e)) {
+      throw const FriendlyNetworkException();
+    }
+    rethrow;
+  } catch (e) {
+    if (isNetworkError(e)) {
+      throw const FriendlyNetworkException();
+    }
+    rethrow;
+  }
+}
 
 // ============================================================
 // GET
@@ -14,15 +47,10 @@ import 'package:flutter/material.dart';
 Future<http.Response> get(
   Uri uri, {
   Map<String, String>? headers,
-}) async {
-  final response = await http.get(
-    uri,
-    headers: headers,
+}) {
+  return _send(
+    () => http.get(uri, headers: headers),
   );
-
-  _checkSubscription(response);
-
-  return response;
 }
 
 // ============================================================
@@ -34,17 +62,15 @@ Future<http.Response> post(
   Map<String, String>? headers,
   Object? body,
   Encoding? encoding,
-}) async {
-  final response = await http.post(
-    uri,
-    headers: headers,
-    body: _prepareBody(body, headers),
-    encoding: encoding,
+}) {
+  return _send(
+    () => http.post(
+      uri,
+      headers: headers,
+      body: _prepareBody(body, headers),
+      encoding: encoding,
+    ),
   );
-
-  _checkSubscription(response);
-
-  return response;
 }
 
 // ============================================================
@@ -56,17 +82,15 @@ Future<http.Response> put(
   Map<String, String>? headers,
   Object? body,
   Encoding? encoding,
-}) async {
-  final response = await http.put(
-    uri,
-    headers: headers,
-    body: _prepareBody(body, headers),
-    encoding: encoding,
+}) {
+  return _send(
+    () => http.put(
+      uri,
+      headers: headers,
+      body: _prepareBody(body, headers),
+      encoding: encoding,
+    ),
   );
-
-  _checkSubscription(response);
-
-  return response;
 }
 
 // ============================================================
@@ -78,17 +102,15 @@ Future<http.Response> patch(
   Map<String, String>? headers,
   Object? body,
   Encoding? encoding,
-}) async {
-  final response = await http.patch(
-    uri,
-    headers: headers,
-    body: _prepareBody(body, headers),
-    encoding: encoding,
+}) {
+  return _send(
+    () => http.patch(
+      uri,
+      headers: headers,
+      body: _prepareBody(body, headers),
+      encoding: encoding,
+    ),
   );
-
-  _checkSubscription(response);
-
-  return response;
 }
 
 // ============================================================
@@ -98,35 +120,18 @@ Future<http.Response> patch(
 Future<http.Response> delete(
   Uri uri, {
   Map<String, String>? headers,
-}) async {
-  final response = await http.delete(
-    uri,
-    headers: headers,
+}) {
+  return _send(
+    () => http.delete(uri, headers: headers),
   );
-
-  _checkSubscription(response);
-
-  return response;
 }
 
 // ============================================================
 // PREPARE REQUEST BODY
 // ============================================================
 //
-// If Content-Type is application/json and the body is a Map,
-// automatically convert it to a JSON string.
-//
-// This allows existing code like:
-//
-// body: {
-//   "email": email,
-//   "password": password,
-// }
-//
-// to work correctly with:
-//
-// Content-Type: application/json
-//
+// Automatically JSON-encodes Map or List bodies when the
+// Content-Type header is application/json.
 // ============================================================
 
 Object? _prepareBody(
@@ -137,13 +142,19 @@ Object? _prepareBody(
     return null;
   }
 
-  final contentType = headers?['Content-Type'] ??
-      headers?['content-type'] ??
-      '';
+  String contentType = '';
+
+  if (headers != null) {
+    for (final entry in headers.entries) {
+      if (entry.key.toLowerCase() == 'content-type') {
+        contentType = entry.value;
+        break;
+      }
+    }
+  }
 
   if (contentType.toLowerCase().contains('application/json')) {
-    if (body is Map ||
-        body is List) {
+    if (body is Map || body is List) {
       return jsonEncode(body);
     }
   }
@@ -161,18 +172,18 @@ void _checkSubscription(http.Response response) {
   }
 
   try {
-    final data = jsonDecode(response.body);
+    final dynamic data = jsonDecode(response.body);
 
-    if (data['subscription_expired'] == true) {
+    if (data is Map &&
+        data['subscription_expired'] == true) {
       navigatorKey.currentState?.pushAndRemoveUntil(
-        MaterialPageRoute(
-          builder: (_) =>
-              const SubscriptionExpiredScreen(),
+        MaterialPageRoute<void>(
+          builder: (_) => const SubscriptionExpiredScreen(),
         ),
         (route) => false,
       );
     }
-  } catch (e) {
-    // Ignore invalid JSON
+  } catch (_) {
+    // Ignore invalid JSON.
   }
 }

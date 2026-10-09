@@ -6,7 +6,12 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'shop_service.dart';
 import 'category_service.dart';
+import 'api_exception.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+
+// TODO: change this path to wherever your isNetworkError / kNoInternetMessage
+// helper file lives.
+import '../helpers/error_helper.dart';
 
 class AuthService {
   static const String baseUrl =
@@ -18,6 +23,62 @@ class AuthService {
 
   static final ValueNotifier<Map<String, dynamic>?> trialNotifier =
       ValueNotifier(null);
+
+  // ============================================================
+  // ERROR HELPERS
+  // ============================================================
+
+  /// Decodes a response body into a Map. Throws a clean
+  /// [ApiException] for server errors or non-JSON replies.
+  /// 4xx replies (wrong password, validation, etc.) are returned
+  /// so their server message can be shown to the user.
+  static Map<String, dynamic> _decode(dynamic response) {
+    final code = response.statusCode as int;
+
+    if (code >= 500) {
+      throw ApiException("Server error. Please try again later.", code);
+    }
+
+    try {
+      final decoded = jsonDecode(response.body);
+
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+    } catch (_) {
+      // falls through
+    }
+
+    throw ApiException("Unexpected response from server.", code);
+  }
+
+  /// Turns any exception into the usual {status: false, message: ...}
+  /// map, with a message that is safe to show to the user.
+  /// The raw error only goes to the debug console.
+  
+    static Map<String, dynamic> _failure(Object e, String fallback) {
+      debugPrint("AuthService error: $e");
+
+      if (isNetworkError(e)) {
+        return {
+          "status": false,
+          "message": kNoInternetMessage,
+        };
+      }
+
+      if (e is ApiException) {
+        return {
+          "status": false,
+          "message": e.message,
+        };
+      }
+
+      return {
+        "status": false,
+        "message": fallback,
+      };
+    }
+
 
   // ============================================================
   // TRIAL
@@ -153,7 +214,11 @@ class AuthService {
       return null;
     }
 
-    return jsonDecode(userString);
+    try {
+      return Map<String, dynamic>.from(jsonDecode(userString));
+    } catch (_) {
+      return null;
+    }
   }
 
   // ============================================================
@@ -204,7 +269,11 @@ class AuthService {
       return true;
     }
 
-    final expiry = DateTime.parse(expiryString);
+    final expiry = DateTime.tryParse(expiryString);
+
+    if (expiry == null) {
+      return true;
+    }
 
     return DateTime.now().isAfter(expiry);
   }
@@ -236,13 +305,17 @@ class AuthService {
         },
       );
 
+      // Only a 401 means the token is really invalid.
       if (response.statusCode == 401) {
         await clearToken();
         return false;
       }
 
-      return response.statusCode == 200;
+      // Any other reply (200, a temporary server error, etc.)
+      // keeps the user signed in.
+      return true;
     } catch (e) {
+      // Offline or timeout: keep the user signed in.
       return true;
     }
   }
@@ -320,7 +393,7 @@ class AuthService {
         }),
       );
 
-      final data = jsonDecode(response.body);
+      final data = _decode(response);
 
       if (data['status'] == true &&
           data['email_verified'] == true) {
@@ -338,11 +411,10 @@ class AuthService {
 
       return data;
     } catch (e) {
-      return {
-        "status": false,
-        "message":
-            "Unable to verify email. Please check your internet connection.",
-      };
+      return _failure(
+        e,
+        "Unable to verify email. Please try again.",
+      );
     }
   }
 
@@ -373,13 +445,12 @@ class AuthService {
         },
       );
 
-      return jsonDecode(response.body);
+      return _decode(response);
     } catch (e) {
-      return {
-        "status": false,
-        "message":
-            "Unable to resend verification code. Please check your internet connection.",
-      };
+      return _failure(
+        e,
+        "Unable to resend verification code. Please try again.",
+      );
     }
   }
 
@@ -414,7 +485,7 @@ class AuthService {
         }),
       );
     } catch (e) {
-      print("FCM token save error: $e");
+      debugPrint("FCM token save error: $e");
     }
   }
 
@@ -444,7 +515,49 @@ class AuthService {
 
     await clearToken();
 
-    await googleSignIn.signOut();
+    try {
+      await googleSignIn.signOut();
+    } catch (e) {
+      // Ignore Google sign-out errors
+    }
+  }
+
+  // ============================================================
+  // SAVE AUTH DATA AFTER LOGIN / REGISTER / GOOGLE LOGIN
+  // ============================================================
+
+  static Future<void> _saveAuthData(
+    Map<String, dynamic> data, {
+    required bool defaultFreeTrial,
+    required int defaultTrialDays,
+    required bool defaultEmailVerified,
+  }) async {
+    await saveToken(data['token']);
+
+    await saveRole(
+      data['role'] ??
+          data['user']?['role'] ??
+          'admin',
+    );
+
+    if (data['user'] != null) {
+      await saveUserInfo(
+        Map<String, dynamic>.from(
+          data['user'],
+        ),
+      );
+    }
+
+    await saveTrialInfo(
+      isFreeTrial:
+          data['is_free_trial'] ?? defaultFreeTrial,
+      trialDaysLeft:
+          data['trial_days_left'] ?? defaultTrialDays,
+    );
+
+    await saveEmailVerified(
+      data['email_verified'] ?? defaultEmailVerified,
+    );
   }
 
   // ============================================================
@@ -457,60 +570,41 @@ class AuthService {
     required String password,
     String? phone,
   }) async {
-
-    final response = await http.post(
-      Uri.parse("$baseUrl/register"),
-      headers: {
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-      },
-      body: jsonEncode({
-        "name": name,
-        "email": email,
-        "password": password,
-        if (phone != null && phone.isNotEmpty)
-          "phone": phone,
-      }),
-    );
-
-    final data = jsonDecode(response.body);
-
-    // ========================================================
-    // SAVE AUTH DATA
-    // ========================================================
-
-    if (data['status'] == true &&
-        data['token'] != null) {
-
-      await saveToken(data['token']);
-
-      await saveRole(
-        data['role'] ??
-            data['user']?['role'] ??
-            'admin',
+    try {
+      final response = await http.post(
+        Uri.parse("$baseUrl/register"),
+        headers: {
+          "Accept": "application/json",
+          "Content-Type": "application/json",
+        },
+        body: jsonEncode({
+          "name": name,
+          "email": email,
+          "password": password,
+          if (phone != null && phone.isNotEmpty)
+            "phone": phone,
+        }),
       );
 
-      if (data['user'] != null) {
-        await saveUserInfo(
-          Map<String, dynamic>.from(
-            data['user'],
-          ),
+      final data = _decode(response);
+
+      if (data['status'] == true &&
+          data['token'] != null) {
+        await _saveAuthData(
+          data,
+          defaultFreeTrial: true,
+          defaultTrialDays: 3,
+          defaultEmailVerified: false,
         );
       }
 
-      await saveTrialInfo(
-        isFreeTrial:
-            data['is_free_trial'] ?? true,
-        trialDaysLeft:
-            data['trial_days_left'] ?? 3,
-      );
-
-      await saveEmailVerified(
-        data['email_verified'] ?? false,
+      return data;
+    } catch (e) {
+      return _failure(
+        e,
+        "Could not create your account. Please try again.",
       );
     }
-
-    return data;
   }
 
   // ============================================================
@@ -521,53 +615,38 @@ class AuthService {
     required String email,
     required String password,
   }) async {
-
-    final response = await http.post(
-      Uri.parse("$baseUrl/login"),
-      headers: {
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-      },
-      body: jsonEncode({
-        "email": email,
-        "password": password,
-      }),
-    );
-
-    final data = jsonDecode(response.body);
-
-    if (data['status'] == true &&
-        data['token'] != null) {
-
-      await saveToken(data['token']);
-
-      await saveRole(
-        data['role'] ??
-            data['user']?['role'] ??
-            'admin',
+    try {
+      final response = await http.post(
+        Uri.parse("$baseUrl/login"),
+        headers: {
+          "Accept": "application/json",
+          "Content-Type": "application/json",
+        },
+        body: jsonEncode({
+          "email": email,
+          "password": password,
+        }),
       );
 
-      if (data['user'] != null) {
-        await saveUserInfo(
-          Map<String, dynamic>.from(
-            data['user'],
-          ),
+      final data = _decode(response);
+
+      if (data['status'] == true &&
+          data['token'] != null) {
+        await _saveAuthData(
+          data,
+          defaultFreeTrial: false,
+          defaultTrialDays: 0,
+          defaultEmailVerified: true,
         );
       }
 
-      await saveTrialInfo(
-        isFreeTrial:
-            data['is_free_trial'] ?? false,
-        trialDaysLeft:
-            data['trial_days_left'] ?? 0,
-      );
-
-      await saveEmailVerified(
-        data['email_verified'] ?? true,
+      return data;
+    } catch (e) {
+      return _failure(
+        e,
+        "Could not log in. Please try again.",
       );
     }
-
-    return data;
   }
 
   // ============================================================
@@ -603,47 +682,24 @@ class AuthService {
         }),
       );
 
-      final data = jsonDecode(response.body);
+      final data = _decode(response);
 
       if (data['status'] == true &&
           data['token'] != null) {
-
-        await saveToken(data['token']);
-
-        await saveRole(
-          data['role'] ??
-              data['user']?['role'] ??
-              'admin',
-        );
-
-        if (data['user'] != null) {
-          await saveUserInfo(
-            Map<String, dynamic>.from(
-              data['user'],
-            ),
-          );
-        }
-
-        await saveTrialInfo(
-          isFreeTrial:
-              data['is_free_trial'] ?? false,
-          trialDaysLeft:
-              data['trial_days_left'] ?? 0,
-        );
-
-        await saveEmailVerified(
-          data['email_verified'] ?? true,
+        await _saveAuthData(
+          data,
+          defaultFreeTrial: false,
+          defaultTrialDays: 0,
+          defaultEmailVerified: true,
         );
       }
 
       return data;
     } catch (e) {
-      print(e);
-
-      return {
-        "status": false,
-        "message": e.toString(),
-      };
+      return _failure(
+        e,
+        "Google sign in failed. Please try again.",
+      );
     }
   }
 
