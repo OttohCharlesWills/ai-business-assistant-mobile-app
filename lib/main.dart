@@ -57,12 +57,10 @@
 
 
 
-
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 
-import 'firebase_options.dart';
 import 'screens/splash_screen.dart';
 import 'providers/notification_provider.dart';
 import 'widgets/connectivity_wrapper.dart';
@@ -73,9 +71,11 @@ final navigatorKey = GlobalKey<NavigatorState>();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  try {
+    await Firebase.initializeApp();
+  } on FirebaseException catch (e) {
+    if (e.code != 'duplicate-app') rethrow;
+  }
 
   await AuthService.loadTrialNotifier();
 
@@ -94,7 +94,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return ConnectivityWrapper(
       child: MaterialApp(
-        navigatorKey: navigatorKey, 
+        navigatorKey: navigatorKey,
         debugShowCheckedModeBanner: false,
         title: "AI Business Assistant",
         theme: ThemeData(

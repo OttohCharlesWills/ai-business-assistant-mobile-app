@@ -27,98 +27,97 @@ class _LoginScreenState extends State<LoginScreen> {
   // NORMAL LOGIN
   // =============================================================
 
-Future<void> login() async {
-  if (loading) return;
+  Future<void> login() async {
+    if (loading) return;
 
-  setState(() => loading = true);
+    setState(() => loading = true);
 
-  try {
-    await AuthService.saveLastEmail(
-      emailController.text.trim(),
-    );
+    try {
+      await AuthService.saveLastEmail(
+        emailController.text.trim(),
+      );
 
-    final response = await AuthService.login(
-      email: emailController.text.trim(),
-      password: passwordController.text,
-    );
+      final response = await AuthService.login(
+        email: emailController.text.trim(),
+        password: passwordController.text,
+      );
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    final success = response['status'] == true;
+      final success = response['status'] == true;
 
-    if (!success) {
+      if (!success) {
+        setState(() => loading = false);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              friendlyError(
+                response['message']?.toString() ??
+                    'Something went wrong. Please try again.',
+              ),
+            ),
+          ),
+        );
+
+        return;
+      }
+
+      // Show success only after authentication succeeds.
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Login successful!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      // FCM is a secondary task. Its failure must not
+      // turn a successful login into a login error.
+      try {
+        await FCMService.init();
+      } catch (e) {
+        debugPrint('FCM initialization error: $e');
+      }
+
+      if (!mounted) return;
+
+      setState(() => loading = false);
+
+      final emailVerified = response['email_verified'] ?? true;
+
+      if (!emailVerified) {
+        final userEmail =
+            response['user']?['email'] ??
+                emailController.text.trim();
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => EmailVerificationScreen(
+              email: userEmail,
+            ),
+          ),
+        );
+
+        return;
+      }
+
+      RoleRouter.navigateFromResponse(
+        context,
+        response,
+      );
+    } catch (e) {
+      if (!mounted) return;
+
       setState(() => loading = false);
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            friendlyError(
-              response['message']?.toString() ??
-                  'Something went wrong. Please try again.',
-            ),
-          ),
+          content: Text(friendlyError(e)),
         ),
       );
-
-      return;
     }
-
-    // Show success only after authentication succeeds.
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Login successful!'),
-        backgroundColor: Colors.green,
-      ),
-    );
-
-    // FCM is a secondary task. Its failure must not
-    // turn a successful login into a login error.
-    try {
-      await FCMService.init();
-    } catch (e) {
-      debugPrint('FCM initialization error: $e');
-    }
-
-    if (!mounted) return;
-
-    setState(() => loading = false);
-
-    final emailVerified = response['email_verified'] ?? true;
-
-    if (!emailVerified) {
-      final userEmail =
-          response['user']?['email'] ??
-              emailController.text.trim();
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => EmailVerificationScreen(
-            email: userEmail,
-          ),
-        ),
-      );
-
-      return;
-    }
-
-    RoleRouter.navigateFromResponse(
-      context,
-      response,
-    );
-  } catch (e) {
-    if (!mounted) return;
-
-    setState(() => loading = false);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(friendlyError(e)),
-      ),
-    );
   }
-}
-
 
   // =============================================================
   // GOOGLE LOGIN
